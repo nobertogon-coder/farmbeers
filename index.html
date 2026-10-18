@@ -2,560 +2,972 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FarmBeers - Triagem Farmacêutica AGS Beers 2023</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FarmBeers - Triagem Farmacêutica</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* RESET & VARS */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    :root {
-      --primary: #0284c7;
-      --primary-dark: #0369a1;
-      --secondary: #0f172a;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --border: #e2e8f0;
-      --text: #334155;
-      --text-muted: #64748b;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-      --success: #10b981;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      line-height: 1.5;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* BARRA SUPERIOR / HEADER */
-    header {
-      background-color: var(--secondary);
-      color: #ffffff;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-    }
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    /* BOTÕES GERAIS */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
-      text-decoration: none;
-    }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-danger { background: var(--danger); color: #fff; }
-    .btn-danger:hover { opacity: 0.9; }
-    .btn-outline {
-      background: transparent;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.4);
-    }
-    .btn-outline:hover { background: rgba(255,255,255,0.1); }
-    .btn-manual { background: #0284c7; color: #fff; }
-    .btn-manual:hover { background: #0369a1; }
-
-    /* LAYOUT & CARDS */
-    .container {
-      max-width: 1200px;
-      margin: 20px auto;
-      padding: 0 16px;
-    }
-    .card {
-      background: var(--card-bg);
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      color: var(--secondary);
-      margin-bottom: 14px;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 8px;
-    }
-
-    /* FORMULÁRIOS & GRIDS */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    label {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--secondary);
-    }
-    input, select, textarea {
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 14px;
-      color: var(--text);
-      outline: none;
-      transition: border-color 0.2s ease;
-      background: #fff;
-    }
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--primary);
-    }
-
-    /* TABELAS */
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      margin-top: 10px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 14px;
-      min-width: 600px;
-    }
-    th, td {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    th {
-      background: #f1f5f9;
-      font-weight: 600;
-      color: var(--secondary);
-    }
-    tr:last-child td { border-bottom: none; }
-
-    /* ALERTAS E BADGES */
-    .badge-danger {
-      background: #fee2e2;
-      color: #991b1b;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .badge-ok {
-      background: #dcfce7;
-      color: #166534;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .alert-card {
-      background: #fff1f2;
-      border-left: 5px solid #e11d48;
-      border-radius: 6px;
-      padding: 14px;
-      margin-top: 12px;
-    }
-    .alert-card h4 {
-      color: #9f1239;
-      margin-bottom: 4px;
-      font-size: 15px;
-    }
-    .alert-card p {
-      font-size: 13px;
-      color: #4c0519;
-      margin-bottom: 6px;
-    }
-    .tapering-box {
-      background: #fdf2f8;
-      padding: 8px 10px;
-      border-radius: 4px;
-      font-size: 12.5px;
-      font-weight: 500;
-      color: #831843;
-      border: 1px dashed #f472b6;
-    }
-
-    /* MODAL DO MANUAL DIGITAL */
-    .manual-modal-overlay {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(4px);
-      z-index: 99999;
-      justify-content: center;
-      align-items: center;
-      padding: 16px;
-    }
-    .manual-modal-overlay.active {
-      display: flex !important;
-    }
-    .manual-modal-content {
-      background: #ffffff;
-      width: 100%;
-      max-width: 820px;
-      max-height: 88vh;
-      border-radius: 12px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: modalFade 0.2s ease-out;
-    }
-    .manual-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 20px;
-      background: var(--secondary);
-      color: #ffffff;
-    }
-    .manual-modal-header h3 {
-      font-size: 1.1rem;
-      margin: 0;
-    }
-    .manual-modal-close {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-size: 24px;
-      cursor: pointer;
-      line-height: 1;
-    }
-    .manual-modal-close:hover { color: #fff; }
-    .manual-modal-body {
-      padding: 20px;
-      overflow-y: auto;
-      font-size: 14px;
-      line-height: 1.6;
-      color: #334155;
-    }
-    .manual-modal-body h4 {
-      color: var(--secondary);
-      margin-top: 14px;
-      margin-bottom: 6px;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 4px;
-    }
-    .manual-modal-body ul {
-      padding-left: 20px;
-      margin-bottom: 12px;
-    }
-
-    @keyframes modalFade {
-      from { opacity: 0; transform: scale(0.97); }
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    /* RESPONSIVIDADE MOBILE (SMARTPHONES) */
-    @media (max-width: 768px) {
-      header {
-        flex-direction: column;
-        gap: 10px;
-        text-align: center;
-      }
-      .header-actions {
-        width: 100%;
-        justify-content: center;
-      }
-      .container {
-        padding: 0 10px;
-        margin: 10px auto;
-      }
-      .card {
-        padding: 14px;
-      }
-      .grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-      input, select, textarea, .btn {
-        width: 100%;
-        font-size: 16px; /* Impede zoom indesejado no iOS */
-      }
-      .manual-modal-content {
-        max-height: 94vh;
-      }
-    }
+    body { background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   </style>
 </head>
-<body>
+<body class="antialiased min-h-screen flex flex-col text-slate-800">
 
-  <!-- HEADER -->
-  <header>
-    <div class="brand">
-      <span>🛡️</span> FarmBeers (AGS Beers 2023)
-    </div>
-    <div class="header-actions">
-      <button type="button" class="btn btn-manual" onclick="toggleManual(true)">
-        📖 Manual Digital
-      </button>
-      <span id="userBadge" style="font-size: 13px; font-weight: 600; color: #94a3b8;">Não Autenticado</span>
-      <button id="authBtn" class="btn btn-outline" onclick="handleAuthClick()">Entrar</button>
-    </div>
-  </header>
-
-  <!-- CONTAINER PRINCIPAL -->
-  <main class="container">
-    
-    <!-- CARD: LOGIN -->
-    <div id="loginCard" class="card" style="max-width: 440px; margin: 40px auto;">
-      <h3 class="card-title">Acesso ao Sistema</h3>
-      <div class="form-group" style="margin-bottom: 12px;">
-        <label for="username">Usuário</label>
-        <input type="text" id="username" placeholder="Ex: farmaceutico, Teste ou admin">
-      </div>
-      <div class="form-group" style="margin-bottom: 16px;">
-        <label for="password">Senha</label>
-        <input type="password" id="password" placeholder="Digite sua senha">
-      </div>
-      <button class="btn btn-primary" style="width: 100%;" onclick="executeLogin()">Entrar no Sistema</button>
-      <p id="loginError" style="color: var(--danger); font-size: 13px; margin-top: 10px; display: none; text-align: center;"></p>
-    </div>
-
-    <!-- PAINEL CLÍNICO PRINCIPAL (Após Login) -->
-    <div id="clinicalPanel" style="display: none;">
-      
-      <!-- CARD: DADOS DO PACIENTE & PARÂMETROS RENAIS -->
-      <div class="card">
-        <h3 class="card-title">1. Dados do Paciente & Parâmetros Renais</h3>
-        <div class="grid">
-          <div class="form-group">
-            <label for="patientAge">Idade (anos)</label>
-            <input type="number" id="patientAge" value="75" min="60" max="120">
-          </div>
-          <div class="form-group">
-            <label for="patientWeight">Peso Real ou Estimado (kg)</label>
-            <input type="number" id="patientWeight" value="65" min="30" max="200">
-          </div>
-          <div class="form-group">
-            <label for="patientSex">Sexo Biológico</label>
-            <select id="patientSex">
-              <option value="M">Masculino</option>
-              <option value="F">Feminino</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="patientCr">Creatinina Sérica (mg/dL)</label>
-            <input type="number" id="patientCr" value="1.0" step="0.1" min="0.2">
-          </div>
-          <div class="form-group">
-            <label for="patientSector">Setor de Internação</label>
-            <select id="patientSector">
-              <option value="UPI (Enfermaria)">UPI (Enfermaria)</option>
-              <option value="UTI Geral">UTI Geral</option>
-              <option value="Emergência">Emergência</option>
-            </select>
-          </div>
+  <!-- MODAL DE LOGIN (SEM RECARREGAMENTO DE PÁGINA) -->
+  <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-90 px-4">
+    <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 border border-slate-200">
+      <div class="text-center mb-5">
+        <div class="inline-flex p-2.5 bg-[#0b2447] text-cyan-400 rounded-lg mb-2">
+          <i data-lucide="shield-check" class="w-7 h-7"></i>
         </div>
-
-        <div style="background: #f1f5f9; padding: 10px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div>
-            <span style="font-size: 13px; font-weight: 600;">Depuração Estimada (Cockcroft-Gault corrigido para sarcopenia):</span>
-            <span id="clcrDisplay" style="font-size: 15px; font-weight: 700; color: var(--primary); margin-left: 6px;">-- mL/min</span>
-          </div>
-          <button class="btn btn-outline" style="color: var(--secondary); border-color: #cbd5e1;" onclick="calculateClCr()">Recalcular ClCr</button>
-        </div>
+        <h2 class="text-xl font-bold text-slate-900">Farm<span class="text-cyan-400">Beers</span></h2>
+        <p class="text-[11px] text-cyan-700 font-semibold uppercase tracking-wider">Triagem Farmacêutica AGS Beers</p>
       </div>
 
-      <!-- CARD: COMORBIDADES & CONDIÇÕES CLÍNICAS (TABELA 3) -->
-      <div class="card">
-        <h3 class="card-title">2. Comorbidades & Condições Específicas</h3>
-        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" id="condFalls"> Histórico ou Risco Alto de Quedas
-          </label>
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" id="condHeart"> Insuficiência Cardíaca (IC)
-          </label>
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" id="condParkinson"> Doença de Parkinson
-          </label>
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" id="condDementia"> Demência / Déficit Cognitivo
-          </label>
-          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-            <input type="checkbox" id="condCKD"> Doença Renal Crônica (DRC)
-          </label>
+      <div class="space-y-3.5">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Usuário</label>
+          <input type="text" id="txtUsername" autofocus
+            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none"
+            placeholder="Ex: admin" onkeydown="if(event.key==='Enter') executeLogin();">
         </div>
-      </div>
-
-      <!-- CARD: ENTRADA DE MEDICAMENTOS & IMPORTAÇÃO DE PDF -->
-      <div class="card">
-        <h3 class="card-title">3. Medicamentos Prescritos</h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
-          Digite os medicamentos (princípio ativo ou nomes comerciais brasileiros como <em>Rivotril, Torsilax, Losec, Plasil, Macrodantina</em>) ou importe a prescrição em PDF.
-        </p>
-
-        <div class="form-group" style="margin-bottom: 12px;">
-          <textarea id="medsInput" rows="5" placeholder="Digite um medicamento por linha. Exemplo:&#10;Clonazepam 2mg&#10;Torsilax 1 cp&#10;Pregabalina 75mg&#10;Omeprazol 40mg"></textarea>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Senha</label>
+          <input type="password" id="txtPass"
+            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none"
+            placeholder="••••••••" onkeydown="if(event.key==='Enter') executeLogin();">
         </div>
-
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <button class="btn btn-primary" onclick="runScreening()">🔍 Realizar Triagem Clínica</button>
-          <label class="btn btn-outline" style="color: var(--secondary); border-color: #cbd5e1; cursor: pointer;">
-            📄 Importar Prescrição em PDF
-            <input type="file" id="pdfUpload" accept=".pdf" style="display: none;" onchange="uploadPrescriptionPdf(this)">
-          </label>
+        <div id="loginErrMsg" class="hidden text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-200">
+          Usuário ou senha incorretos.
         </div>
-      </div>
-
-      <!-- CARD: RESULTADOS DA TRIAGEM -->
-      <div id="resultsCard" class="card" style="display: none;">
-        <h3 class="card-title">4. Parecer Farmacêutico & Alertas AGS Beers 2023</h3>
-        
-        <div style="display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap;">
-          <div style="background: #f8fafc; border: 1px solid var(--border); padding: 8px 14px; border-radius: 6px; font-size: 13px;">
-            Total Prescrito: <strong id="resTotalMeds">0</strong>
-          </div>
-          <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 8px 14px; border-radius: 6px; font-size: 13px; color: #9f1239;">
-            Alertas de Beers Identificados: <strong id="resTotalAlerts">0</strong>
-          </div>
-        </div>
-
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Medicamento</th>
-                <th>Status Clínico</th>
-                <th>Eixo / Classificação</th>
-                <th>Recomendação AGS Beers</th>
-                <th>Plano de Desmame / Desprescrição</th>
-              </tr>
-            </thead>
-            <tbody id="medsTableBody"></tbody>
-          </table>
-        </div>
-
-        <div id="alertsContainer" style="margin-top: 16px;"></div>
-      </div>
-
-    </div>
-  </main>
-
-  <!-- MODAL DO MANUAL DIGITAL -->
-  <div id="manualModal" class="manual-modal-overlay" onclick="handleOverlayClick(event)">
-    <div class="manual-modal-content">
-      <div class="manual-modal-header">
-        <h3>📘 Manual do Usuário & Diretrizes Clínicas - FarmBeers</h3>
-        <button type="button" class="manual-modal-close" onclick="toggleManual(false)">&times;</button>
-      </div>
-      <div class="manual-modal-body">
-        <div style="background-color: #f0fdf4; border-left: 4px solid #16a34a; padding: 10px 14px; border-radius: 4px; margin-bottom: 15px;">
-          <strong>Finalidade:</strong> Apoio à decisão clínica e triagem farmacêutica em idosos internados (UPI/UTI), orientada estritamente pelos <em>Critérios AGS Beers 2023</em> e adaptada à prática hospitalar brasileira.
-        </div>
-
-        <h4>1. Estrutura dos Alertas Farmacêuticos</h4>
-        <ul>
-          <li><strong>Tabela 2 (MPI Geral - Evitar Sempre):</strong> Medicamentos com relação risco-benefício desfavorável no idoso independente do diagnóstico (ex.: Benzodiazepínicos, Hipnóticos Z, Relaxantes Musculares, AINEs, Glibenclamida).</li>
-          <li><strong>Tabela 6 (Ajuste Renal Condicional):</strong> Dispara alerta exclusivamente se o $ClCr$ estimado estiver abaixo da faixa de corte (ex.: Pregabalina e Gabapentina se &lt; 60 mL/min; Nitrofurantoína, Metformina, Espironolactona e Sulfametoxazol+Trimetoprima se &lt; 30 mL/min).</li>
-          <li><strong>Tabela 3 (Cruzamento Fármaco-Doença):</strong> Avaliação combinada com Insuficiência Cardíaca, Doença de Parkinson, Demência, DRC e Histórico/Risco de Quedas.</li>
-          <li><strong>Tabela 5 (Interações Medicamentosas Críticas):</strong> Mapeamento de combinações sinérgicas de alto risco (ex.: Opioides + Benzodiazepínicos; AINEs + Anticoagulantes).</li>
-        </ul>
-
-        <h4>2. Como Utilizar no Leito / Plantão</h4>
-        <ul>
-          <li><strong>Passo 1:</strong> Preencha os dados do paciente (idade, peso, sexo e creatinina sérica) para o cálculo automático do $ClCr$. O sistema aplica proteção automática contra subestimação da função renal por sarcopenia geriátrica.</li>
-          <li><strong>Passo 2:</strong> Selecione comorbidades ativas e marque caso haja risco aumentado de quedas.</li>
-          <li><strong>Passo 3:</strong> Digite a prescrição (aceita tanto nomes genéricos quanto as marcas comerciais hospitalares) ou importe diretamente o PDF da prescrição médica.</li>
-          <li><strong>Passo 4:</strong> Clique em <em>Realizar Triagem Clínica</em> para visualizar a tabela estratificada, justificativas farmacológicas e esquemas sugeridos de desmame gradual (*tapering*).</li>
-        </ul>
-
-        <h4>3. Usuários e Perfis de Acesso</h4>
-        <ul>
-          <li><strong>farmaceutico / farm123:</strong> Perfil clínico para triagens e emissão de pareceres farmacêuticos.</li>
-          <li><strong>Teste / 12345:</strong> Perfil rápido para homologação e treinamentos no plantão.</li>
-          <li><strong>admin / admin123:</strong> Gestão de contas de usuários e acesso a indicadores da Comissão de Farmácia e Terapêutica (CFT).</li>
-        </ul>
+        <button type="button" onclick="executeLogin()"
+          class="w-full py-2.5 bg-[#008170] hover:bg-[#005B41] text-white font-bold text-sm rounded-lg shadow transition">
+          Entrar no Sistema
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- SCRIPTS -->
+  <!-- MODAL: CONFERÊNCIA OBRIGATÓRIA DE EXTRAÇÃO PDF -->
+  <div id="pdfReviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4">
+    <div class="bg-white w-full max-w-md rounded-xl shadow-2xl p-5 border border-slate-200 space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="text-xs font-bold uppercase text-slate-800 flex items-center gap-1.5">
+          <i data-lucide="check-square" class="w-4 h-4 text-cyan-600"></i> Conferência de Fármacos Extraídos (PDF)
+        </h3>
+        <button onclick="togglePdfReviewModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <p class="text-[11px] text-slate-500">
+        Confirme os medicamentos identificados antes de inseri-los na lista ativa.
+      </p>
+      <div id="pdfExtractedChecklist" class="space-y-1.5 max-h-56 overflow-y-auto p-2 bg-slate-50 rounded border text-xs"></div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="togglePdfReviewModal(false)" class="px-3 py-1.5 text-xs text-slate-600 bg-slate-100 rounded">Cancelar</button>
+        <button type="button" onclick="confirmPdfMedications()" class="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow">Adicionar Selecionados</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GESTÃO DE USUÁRIOS (ADMIN) -->
+  <div id="usersAdminModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4">
+    <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-6 border border-slate-200 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="text-sm font-bold uppercase text-slate-800 flex items-center gap-2">
+          <i data-lucide="users" class="w-4 h-4 text-cyan-600"></i> Gestão de Usuários do Sistema
+        </h3>
+        <button onclick="toggleUsersModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <form onsubmit="handleCreateUser(event)" class="bg-slate-50 p-3 rounded border border-slate-200 space-y-2">
+        <span class="text-[11px] font-bold text-slate-700 uppercase block">+ Cadastrar Novo Usuário</span>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <input type="text" id="newUsername" required placeholder="Nome de Usuário" class="text-xs p-1.5 border rounded bg-white outline-none">
+          <input type="password" id="newUserPass" required placeholder="Senha de Acesso" class="text-xs p-1.5 border rounded bg-white outline-none">
+          <select id="newUserRole" class="text-xs p-1.5 border rounded bg-white outline-none">
+            <option value="pharmacist">Farmacêutico</option>
+            <option value="admin">Administrador</option>
+          </select>
+          <button type="submit" class="bg-[#008170] hover:bg-[#005B41] text-white text-xs font-bold rounded py-1.5 shadow">Salvar</button>
+        </div>
+        <div id="createUserMsg" class="hidden text-xs p-1.5 rounded"></div>
+      </form>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left">
+          <thead>
+            <tr class="border-b text-slate-500 uppercase text-[10px]">
+              <th class="py-1.5">Usuário</th>
+              <th class="py-1.5">Perfil</th>
+              <th class="py-1.5">Presença (Tempo Real)</th>
+              <th class="py-1.5">Conta</th>
+              <th class="py-1.5 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody" class="divide-y divide-slate-100">
+            <tr><td colspan="5" class="py-4 text-center text-slate-400">Carregando usuários...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INDICADORES CLÍNICOS CFT (ADMIN) -->
+  <div id="metricsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4">
+    <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl p-6 border border-slate-200 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-600"></i> Indicadores Clínicos de Beers
+          </h3>
+          <p class="text-xs text-slate-500">Métricas consolidadas de prescrições inadequadas para auditoria e CFT</p>
+        </div>
+        <button onclick="toggleMetricsModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center gap-3 text-xs">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Dia</label>
+          <input type="number" id="filterDay" min="1" max="31" placeholder="Ex: 15" class="w-16 p-1.5 border rounded bg-white outline-none">
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Mês</label>
+          <select id="filterMonth" class="p-1.5 border rounded bg-white outline-none">
+            <option value="">Todos</option>
+            <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+            <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+            <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+            <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
+          <input type="number" id="filterYear" value="2026" class="w-20 p-1.5 border rounded bg-white outline-none">
+        </div>
+        <button type="button" onclick="loadMetricsData()" class="mt-4 bg-[#0b2447] hover:bg-[#19376d] text-white font-bold px-3 py-1.5 rounded shadow">
+          Filtrar Período
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="bg-cyan-50/70 p-3.5 rounded-lg border border-cyan-200 text-center">
+          <span class="text-[10px] font-bold text-cyan-800 uppercase tracking-wider block">Total Geral de Pacientes</span>
+          <strong id="metricTotalPatients" class="text-2xl font-extrabold text-[#0b2447] mt-1 block">0</strong>
+        </div>
+        <div class="bg-emerald-50/70 p-3.5 rounded-lg border border-emerald-200 text-center">
+          <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
+          <strong id="metricTotalUPI" class="text-2xl font-extrabold text-emerald-700 mt-1 block">0</strong>
+        </div>
+        <div class="bg-indigo-50/70 p-3.5 rounded-lg border border-indigo-200 text-center">
+          <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
+          <strong id="metricTotalUTI" class="text-2xl font-extrabold text-indigo-700 mt-1 block">0</strong>
+        </div>
+      </div>
+
+      <div class="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-center">
+        <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Total de Alertas de Beers Identificados</span>
+        <strong id="metricTotalBeersAlerts" class="text-2xl font-extrabold text-amber-600 mt-0.5 block">0</strong>
+      </div>
+
+      <div class="border border-slate-200 rounded-lg p-3.5 bg-white">
+        <h4 class="text-xs font-bold uppercase text-slate-700 mb-2 flex items-center gap-1.5">
+          <i data-lucide="flame" class="w-4 h-4 text-rose-500"></i> Top 5 Medicamentos Inapropriados Mais Encontrados
+        </h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead>
+              <tr class="border-b text-slate-400 uppercase text-[10px]">
+                <th class="py-1.5">Fármaco de Beers</th>
+                <th class="py-1.5 text-right">Ocorrências</th>
+              </tr>
+            </thead>
+            <tbody id="top5TableBody" class="divide-y divide-slate-100">
+              <tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro para o período.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA SUPERIOR -->
+  <header class="bg-[#0b2447] text-white px-6 py-2.5 shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded bg-[#19376d] border border-cyan-500 flex items-center justify-center font-bold text-cyan-400 text-sm">
+          FB
+        </div>
+        <div>
+          <span class="text-base font-bold tracking-tight text-white">Farm<span class="text-cyan-400">Beers</span></span>
+          <span class="block text-[9px] text-cyan-400 tracking-wider uppercase font-semibold -mt-1">Triagem Farmacêutica</span>
+        </div>
+      </div>
+
+      <div>
+        <button onclick="resetFullApp()"
+          class="bg-[#008170] hover:bg-[#005B41] text-white text-xs font-semibold px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Nova Triagem</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-6 text-xs">
+        <div>
+          <span class="text-[10px] text-slate-300 block uppercase">ClCr Calculado</span>
+          <strong id="topCrcl" class="text-cyan-300 text-xs">-- mL/min</strong>
+        </div>
+        <div>
+          <span class="text-[10px] text-amber-300 block uppercase">Critérios de Beers</span>
+          <strong id="topBeersCount" class="text-amber-400 text-xs">0</strong>
+        </div>
+
+        <div class="h-6 w-px bg-slate-600"></div>
+
+        <div class="flex items-center gap-2">
+          <div class="text-right">
+            <span id="lblUserName" class="block font-bold text-slate-100 text-[11px]">admin (ADMIN)</span>
+          </div>
+
+          <div id="adminActionButtons" class="hidden flex items-center gap-1.5">
+            <button onclick="toggleMetricsModal(true)"
+              class="bg-cyan-900/80 hover:bg-cyan-800 text-cyan-200 text-[10px] px-2 py-1 rounded font-semibold border border-cyan-700 flex items-center gap-1"
+              title="Acessar Indicadores Clínicos">
+              <i data-lucide="bar-chart-2" class="w-3 h-3"></i> Indicadores
+            </button>
+            <button onclick="toggleUsersModal(true)"
+              class="bg-sky-800 hover:bg-sky-700 text-white text-[10px] px-2 py-1 rounded font-semibold border border-sky-600 flex items-center gap-1"
+              title="Gerenciar Usuários">
+              <i data-lucide="users" class="w-3 h-3"></i> Usuários
+            </button>
+          </div>
+
+          <button onclick="executeLogout()" class="text-slate-300 hover:text-rose-400 text-xs flex items-center gap-1 ml-2">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sair
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- CORPO PRINCIPAL -->
+  <main class="max-w-7xl w-full mx-auto p-4 space-y-4 flex-1">
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- BLOCO 1 -->
+      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-3">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">1. Paciente & Diagnósticos</h3>
+        
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Idade (Anos)</label>
+            <input type="number" id="inpAge" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="71" oninput="calculateCrCl(); saveState();">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Setor</label>
+            <select id="selSector" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none font-bold text-slate-700" onchange="saveState()">
+              <option value="UPI (Enfermaria)">UPI (Enfermaria)</option>
+              <option value="UTI">UTI</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="chkFallRisk" class="rounded text-emerald-600 focus:ring-0" onchange="saveState()">
+          <label for="chkFallRisk" class="text-[11px] font-bold text-blue-900 cursor-pointer">Risco Alto de Queda (Idoso / Avaliação)</label>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Comorbidades / Condições Clínicas</label>
+          <input type="text" id="inpConditions" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Selecione ou adicione via atalhos..." oninput="saveState()">
+        </div>
+
+        <div class="flex flex-wrap gap-1 pt-1">
+          <button type="button" onclick="addCond('HAS')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ HAS</button>
+          <button type="button" onclick="addCond('DM')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DM</button>
+          <button type="button" onclick="addCond('DRC')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DRC</button>
+          <button type="button" onclick="addCond('Insuficiência Cardíaca')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ IC</button>
+          <button type="button" onclick="addCond('Demência')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ Demência</button>
+          <button type="button" onclick="addCond('Doença de Parkinson')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ Parkinson</button>
+          <button type="button" onclick="addCond('DPOC')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DPOC</button>
+          <button type="button" onclick="addCond('IAM')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ IAM</button>
+        </div>
+      </div>
+
+      <!-- BLOCO 2 -->
+      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-2.5">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Função Renal & Antropometria</h3>
+
+        <div class="grid grid-cols-3 gap-1.5">
+          <div>
+            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Creatinina (mg/dL)</label>
+            <input type="number" id="inpCreatinine" step="0.01" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 1.2" oninput="calculateCrCl(); saveState();">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Peso (kg)</label>
+            <input type="number" id="inpWeight" step="0.1" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 70" oninput="calculateCrCl(); saveState();">
+          </div>
+          <div>
+            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Altura (cm)</label>
+            <input type="number" id="inpHeight" step="1" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 165" oninput="calculateCrCl(); saveState();">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Sexo Biológico</label>
+          <select id="selGender" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" onchange="calculateCrCl(); saveState();">
+            <option value="M">Masculino</option>
+            <option value="F">Feminino (x0.85)</option>
+          </select>
+        </div>
+
+        <div class="p-2 bg-slate-50 rounded border border-slate-200 text-center">
+          <span class="block text-[10px] text-slate-500 font-bold uppercase">Depuração Estimada</span>
+          <strong id="boxCrClResult" class="text-sm font-bold text-slate-800">-- mL/min</strong>
+          <span id="boxWeightNotes" class="block text-[10px] text-cyan-800 font-medium mt-0.5"></span>
+          <span id="boxCrclAlert" class="hidden block text-[10px] text-amber-800 bg-amber-50 border border-amber-200 p-1 rounded mt-1 font-semibold"></span>
+        </div>
+      </div>
+
+      <!-- BLOCO 3 -->
+      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-2.5">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">3. Entrada da Prescrição</h3>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Prescrição Hospitalar (PDF)</label>
+          <input type="file" id="filePdf" accept="application/pdf" class="w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" onchange="uploadPdf(event)">
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ou Cole a Prescrição</label>
+          <textarea id="txtRawPrescription" rows="2" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none font-mono" placeholder="Cole o texto da prescrição..."></textarea>
+        </div>
+
+        <button type="button" onclick="parseRawText()"
+          class="w-full py-1.5 bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold rounded shadow transition">
+          Extrair Prescrição Completa
+        </button>
+      </div>
+
+    </div>
+
+    <!-- BLOCO 4 -->
+    <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">4. Medicamentos em Uso</h3>
+        <span id="lblUnifiedTotalMeds" class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">0 Medicamentos</span>
+      </div>
+
+      <div class="bg-slate-50 p-2.5 rounded border border-slate-200 space-y-1.5">
+        <span class="text-[10px] font-bold text-slate-600 uppercase block">+ Adição Rápida Manual</span>
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+          <input type="text" id="manualDrugName" class="sm:col-span-5 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Princípio Ativo ou Medicamento...">
+          <input type="text" id="manualDrugDose" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Dose (Ex: 25mg)">
+          <select id="manualDrugRoute" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none">
+            <option value="VO (Oral)">VO (Oral)</option>
+            <option value="IV (Endovenoso)">IV (Endovenoso)</option>
+            <option value="SC (Subcutâneo)">SC (Subcutâneo)</option>
+            <option value="IM (Intramuscular)">IM (Intramuscular)</option>
+            <option value="Tópico">Tópico</option>
+            <option value="Inalatório">Inalatório</option>
+          </select>
+          <input type="text" id="manualDrugFreq" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Posologia (Ex: 1x/dia)">
+          <button type="button" onclick="addMedicationFromInputs()" class="sm:col-span-1 bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold rounded py-1.5 shadow">+ Inserir</button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-xs text-left">
+          <thead class="bg-slate-100 border-b border-slate-200 text-slate-700 uppercase text-[10px] font-bold">
+            <tr>
+              <th class="py-2.5 px-3">Medicamento / Princípio Ativo</th>
+              <th class="py-2.5 px-3">Dose / Via / Frequência</th>
+              <th class="py-2.5 px-3">Avaliação AGS Beers</th>
+              <th class="py-2.5 px-3 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="unifiedMedsTableBody" class="divide-y divide-slate-100">
+            <tr>
+              <td colspan="4" class="py-6 text-center text-slate-400">Nenhum medicamento na lista de triagem.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" onclick="processCompleteScreening()"
+        class="w-full py-3 bg-[#008170] hover:bg-[#005B41] text-white text-sm font-bold rounded-lg shadow-md transition flex items-center justify-center gap-2">
+        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+        <span>Processar Triagem Farm-Beers (AGS Beers 2023)</span>
+      </button>
+
+    </div>
+
+    <!-- PARECER GERADO -->
+    <div id="screeningReportBox" class="hidden bg-white rounded-lg p-5 border border-slate-200 shadow-sm space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <div>
+          <span class="text-[10px] font-bold uppercase text-emerald-700 tracking-wider">Parecer Farmacoterapêutico de Beers</span>
+          <h2 class="text-base font-bold text-slate-900">Plano de Intervenção Clínica e Desprescrição</h2>
+        </div>
+        <div id="reportBadgeSummary" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+          0 Alertas Identificados
+        </div>
+      </div>
+      <div id="reportAlertsList" class="space-y-3"></div>
+    </div>
+
+  </main>
+
   <script>
+    const STORAGE_KEY = "farmbeers_active_state";
+    const USER_KEY = "farmbeers_auth_data";
+
+    let medicationsList = [];
+    let calculatedCrCl = null;
+    let crclClinicalNote = "";
     let currentUser = null;
+    let pingInterval = null;
+    let pendingPdfMedications = [];
 
-    // ABRIR/FECHAR MANUAL
-    function toggleManual(show) {
-      const modal = document.getElementById('manualModal');
-      if (show) modal.classList.add('active');
-      else modal.classList.remove('active');
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      verifyAuth();
+      restoreSavedState();
+    });
+
+    window.addEventListener("beforeunload", () => {
+      if (currentUser) {
+        navigator.sendBeacon("/api/v1/auth/logout", JSON.stringify({ username: currentUser.username }));
+      }
+    });
+
+    function verifyAuth() {
+      const stored = localStorage.getItem(USER_KEY);
+      if (stored) {
+        currentUser = JSON.parse(stored);
+        document.getElementById("loginModal").classList.add("hidden");
+        document.getElementById("lblUserName").innerText = `${currentUser.username} (${currentUser.role.toUpperCase()})`;
+        
+        if (currentUser.role === "admin") {
+          document.getElementById("adminActionButtons").classList.remove("hidden");
+        }
+
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          fetch("/api/v1/auth/ping", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ username: currentUser.username })
+          });
+        }, 25000);
+
+      } else {
+        document.getElementById("loginModal").classList.remove("hidden");
+      }
     }
 
-    function handleOverlayClick(e) {
-      if (e.target.id === 'manualModal') toggleManual(false);
-    }
-
-    // LOGIN & SESSÃO
     async function executeLogin() {
-      const u = document.getElementById('username').value.trim();
-      const p = document.getElementById('password').value.trim();
-      const err = document.getElementById('loginError');
-      err.style.display = 'none';
+      const username = document.getElementById("txtUsername").value.trim();
+      const password = document.getElementById("txtPass").value.trim();
+      const err = document.getElementById("loginErrMsg");
 
-      if (!u || !p) {
-        err.innerText = 'Preencha usuário e senha.';
-        err.style.display = 'block';
+      if (!username || !password) {
+        err.innerText = "Preencha o usuário e a senha.";
+        err.classList.remove("hidden");
         return;
       }
 
       try {
-        const resp = await fetch('/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: u, password: p })
+        const res = await fetch("/api/v1/auth/login", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ username, password })
         });
-        const data = await resp.json();
-        if (!resp.ok) {
-          err.innerText = data.detail || 'Falha ao autenticar.';
-          err.style.display = 'block';
-          return;
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Erro de login");
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        document.getElementById("loginModal").classList.add("hidden");
+        verifyAuth();
+      } catch (e) {
+        err.innerText = e.message;
+        err.classList.remove("hidden");
+      }
+    }
+
+    async function executeLogout() {
+      if (currentUser) {
+        await fetch("/api/v1/auth/logout", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ username: currentUser.username })
+        });
+      }
+      localStorage.removeItem(USER_KEY);
+      location.reload();
+    }
+
+    function toggleUsersModal(show) {
+      const m = document.getElementById("usersAdminModal");
+      if (show) {
+        m.classList.remove("hidden");
+        loadUsersTable();
+      } else {
+        m.classList.add("hidden");
+      }
+    }
+
+    async function loadUsersTable() {
+      const tbody = document.getElementById("usersTableBody");
+      try {
+        const res = await fetch("/api/v1/admin/users");
+        const users = await res.json();
+        tbody.innerHTML = "";
+
+        users.forEach(u => {
+          const statusBadge = u.is_online
+            ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online</span>`
+            : `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Offline</span>`;
+
+          const accountBadge = u.is_active
+            ? `<span class="text-[10px] font-bold text-emerald-600">Ativo</span>`
+            : `<span class="text-[10px] font-bold text-rose-600">Bloqueado</span>`;
+
+          const actionButtons = u.username === "admin"
+            ? `<span class="text-[10px] text-slate-400 italic">Padrão</span>`
+            : `
+              <button onclick="toggleUserStatus(${u.id})" class="text-[10px] font-bold px-2 py-0.5 rounded border ${u.is_active ? 'text-amber-700 border-amber-300 hover:bg-amber-50' : 'text-emerald-700 border-emerald-300 hover:bg-emerald-50'}">
+                ${u.is_active ? 'Bloquear' : 'Desbloquear'}
+              </button>
+              <button onclick="deleteUser(${u.id})" class="text-[10px] font-bold px-2 py-0.5 rounded border text-rose-700 border-rose-300 hover:bg-rose-50 ml-1">
+                Excluir
+              </button>
+            `;
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2 font-bold text-slate-800">${u.username}</td>
+              <td class="py-2 capitalize text-slate-600">${u.role}</td>
+              <td class="py-2">${statusBadge}</td>
+              <td class="py-2">${accountBadge}</td>
+              <td class="py-2 text-right">${actionButtons}</td>
+            </tr>
+          `;
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-rose-500">Erro ao carregar lista de usuários.</td></tr>`;
+      }
+    }
+
+    async function handleCreateUser(e) {
+      e.preventDefault();
+      const msg = document.getElementById("createUserMsg");
+      const payload = {
+        username: document.getElementById("newUsername").value.trim(),
+        password: document.getElementById("newUserPass").value.trim(),
+        role: document.getElementById("newUserRole").value
+      };
+
+      try {
+        const res = await fetch("/api/v1/admin/users", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Falha ao cadastrar.");
+
+        msg.className = "text-xs p-1.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+        msg.innerText = "Usuário cadastrado com sucesso!";
+        document.getElementById("newUsername").value = "";
+        document.getElementById("newUserPass").value = "";
+        loadUsersTable();
+        setTimeout(() => msg.classList.add("hidden"), 2500);
+      } catch (err) {
+        msg.className = "text-xs p-1.5 rounded bg-rose-50 text-rose-800 border border-rose-200 block";
+        msg.innerText = err.message;
+      }
+    }
+
+    async function toggleUserStatus(userId) {
+      if (!confirm("Deseja alterar o status de acesso deste usuário?")) return;
+      await fetch(`/api/v1/admin/users/${userId}/toggle-status`, { method: "PATCH" });
+      loadUsersTable();
+    }
+
+    async function deleteUser(userId) {
+      if (!confirm("Tem certeza que deseja excluir este usuário permanentemente?")) return;
+      await fetch(`/api/v1/admin/users/${userId}`, { method: "DELETE" });
+      loadUsersTable();
+    }
+
+    function toggleMetricsModal(show) {
+      const m = document.getElementById("metricsModal");
+      if (show) {
+        m.classList.remove("hidden");
+        loadMetricsData();
+      } else {
+        m.classList.add("hidden");
+      }
+    }
+
+    async function loadMetricsData() {
+      const day = document.getElementById("filterDay").value;
+      const month = document.getElementById("filterMonth").value;
+      const year = document.getElementById("filterYear").value || 2026;
+
+      let url = `/api/v1/admin/metrics?year=${year}`;
+      if (month) url += `&month=${month}`;
+      if (day) url += `&day=${day}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        document.getElementById("metricTotalPatients").innerText = data.total_patients;
+        document.getElementById("metricTotalUPI").innerText = data.count_upi;
+        document.getElementById("metricTotalUTI").innerText = data.count_uti;
+        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts;
+
+        const tbody = document.getElementById("top5TableBody");
+        tbody.innerHTML = "";
+
+        if (data.top_5_beers && data.top_5_beers.length > 0) {
+          data.top_5_beers.forEach(item => {
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-50">
+                <td class="py-2 font-bold text-slate-800">${item.drug}</td>
+                <td class="py-2 text-right font-extrabold text-amber-600">${item.count}</td>
+              </tr>
+            `;
+          });
+        } else {
+          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum medicamento inapropriado registrado para este período.</td></tr>`;
+        }
+      } catch (e) {
+        console.error("Erro ao carregar indicadores.");
+      }
+    }
+
+    function calculateCrCl() {
+      const age = parseFloat(document.getElementById("inpAge").value);
+      const rawScr = parseFloat(document.getElementById("inpCreatinine").value);
+      const weight = parseFloat(document.getElementById("inpWeight").value);
+      const height = parseFloat(document.getElementById("inpHeight").value);
+      const gender = document.getElementById("selGender").value;
+
+      const alertBox = document.getElementById("boxCrclAlert");
+      const notesBox = document.getElementById("boxWeightNotes");
+      alertBox.classList.add("hidden");
+      notesBox.innerText = "";
+      crclClinicalNote = "";
+
+      if (age > 0 && rawScr > 0 && weight > 0) {
+        let scrUsed = rawScr;
+        if (rawScr < 0.6) {
+          scrUsed = 0.6;
+          alertBox.innerText = `Atenção: Creatinina sérica (${rawScr} mg/dL) baixa. Aplicado piso protetor de 0,6 mg/dL para mitigar superestimação por sarcopenia.`;
+          alertBox.classList.remove("hidden");
+          crclClinicalNote = `Creatinina arredondada de ${rawScr} para 0.6 mg/dL por sarcopenia.`;
         }
 
-        currentUser = data.user;
-        document.getElementById('userBadge').innerText = `${currentUser.username} (${currentUser.role})`;
-        document.getElementById('authBtn').innerText = 'Sair';
-        document.getElementById('authBtn').className = 'btn btn-danger';
-        document.getElementById('loginCard').style.display = 'none';
-        document.getElementById('clinicalPanel').style.display = 'block';
-        calculate
+        let weightUsed = weight;
+        let weightType = "Peso Real";
+
+        if (height > 100) {
+          const heightM = height / 100;
+          const bmi = weight / (heightM * heightM);
+          
+          const baseHeight = 152.4;
+          const inchesOver = Math.max(0, (height - baseHeight) / 2.54);
+          let ibw = gender === "M" ? 50 + (2.3 * inchesOver) : 45.5 + (2.3 * inchesOver);
+
+          if (bmi >= 30 || weight > (ibw * 1.2)) {
+            weightUsed = ibw + 0.4 * (weight - ibw);
+            weightType = `Peso Ajustado (${Math.round(weightUsed * 10) / 10} kg | IMC: ${Math.round(bmi * 10) / 10})`;
+          } else {
+            weightType = `Peso Real (IMC: ${Math.round(bmi * 10) / 10})`;
+          }
+        }
+
+        let crcl = ((140 - age) * weightUsed) / (72 * scrUsed);
+        if (gender === "F") crcl *= 0.85;
+
+        calculatedCrCl = Math.round(crcl * 10) / 10;
+        document.getElementById("boxCrClResult").innerText = `${calculatedCrCl} mL/min`;
+        document.getElementById("topCrcl").innerText = `${calculatedCrCl} mL/min`;
+        notesBox.innerText = `Base: ${weightType}`;
+      } else {
+        calculatedCrCl = null;
+        document.getElementById("boxCrClResult").innerText = `-- mL/min`;
+        document.getElementById("topCrcl").innerText = `-- mL/min`;
+      }
+    }
+
+    function addCond(cond) {
+      const inp = document.getElementById("inpConditions");
+      const current = inp.value.trim();
+      inp.value = current ? `${current}, ${cond}` : cond;
+      saveState();
+    }
+
+    function addMedicationFromInputs() {
+      const name = document.getElementById("manualDrugName").value.trim();
+      const dose = document.getElementById("manualDrugDose").value.trim();
+      const route = document.getElementById("manualDrugRoute").value;
+      const freq = document.getElementById("manualDrugFreq").value.trim();
+
+      if (!name) return alert("Informe o nome do medicamento.");
+
+      medicationsList.push({ name, dose, route, frequency: freq });
+      document.getElementById("manualDrugName").value = "";
+      document.getElementById("manualDrugDose").value = "";
+      document.getElementById("manualDrugFreq").value = "";
+      refreshUnifiedTable();
+      saveState();
+    }
+
+    function removeMedication(index) {
+      medicationsList.splice(index, 1);
+      refreshUnifiedTable();
+      saveState();
+    }
+
+    async function refreshUnifiedTable() {
+      const tbody = document.getElementById("unifiedMedsTableBody");
+      document.getElementById("lblUnifiedTotalMeds").innerText = `${medicationsList.length} Medicamento(s)`;
+
+      if (medicationsList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400">Nenhum medicamento na lista de triagem.</td></tr>`;
+        document.getElementById("topBeersCount").innerText = "0";
+        return;
+      }
+
+      const payload = {
+        age: parseInt(document.getElementById("inpAge").value) || 70,
+        sector: document.getElementById("selSector").value,
+        fall_risk: document.getElementById("chkFallRisk").checked,
+        conditions: document.getElementById("inpConditions").value.split(/[,]+/).map(c => c.trim()).filter(Boolean),
+        crcl_ml_min: calculatedCrCl,
+        crcl_notes: crclClinicalNote,
+        medications: medicationsList
+      };
+
+      try {
+        const res = await fetch("/api/v1/screen", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        document.getElementById("topBeersCount").innerText = data.total_beers_alerts;
+
+        tbody.innerHTML = "";
+        data.medication_rows.forEach((row, idx) => {
+          const statusBadge = row.is_beers
+            ? `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                 <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i> ${row.alert_tag}
+               </span>`
+            : `<span class="text-slate-400 text-[10px]">Sem alertas AGS</span>`;
+
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3 font-bold text-slate-800">${row.name}</td>
+              <td class="py-2.5 px-3 text-slate-600">${row.dose_route}</td>
+              <td class="py-2.5 px-3">${statusBadge}</td>
+              <td class="py-2.5 px-3 text-right">
+                <button onclick="removeMedication(${idx})" class="text-rose-600 hover:text-rose-800 font-bold text-[11px]">Remover</button>
+              </td>
+            </tr>
+          `;
+        });
+        lucide.createIcons();
+      } catch (e) {
+        console.error("Erro na verificação de Beers.");
+      }
+    }
+
+    function saveState() {
+      const state = {
+        age: document.getElementById("inpAge").value,
+        sector: document.getElementById("selSector").value,
+        fall_risk: document.getElementById("chkFallRisk").checked,
+        conditions: document.getElementById("inpConditions").value,
+        creat: document.getElementById("inpCreatinine").value,
+        weight: document.getElementById("inpWeight").value,
+        height: document.getElementById("inpHeight").value,
+        gender: document.getElementById("selGender").value,
+        meds: medicationsList
+      };
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function restoreSavedState() {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const s = JSON.parse(saved);
+        document.getElementById("inpAge").value = s.age || "";
+        document.getElementById("selSector").value = s.sector || "UPI (Enfermaria)";
+        document.getElementById("chkFallRisk").checked = !!s.fall_risk;
+        document.getElementById("inpConditions").value = s.conditions || "";
+        document.getElementById("inpCreatinine").value = s.creat || "";
+        document.getElementById("inpWeight").value = s.weight || "";
+        document.getElementById("inpHeight").value = s.height || "";
+        document.getElementById("selGender").value = s.gender || "M";
+        medicationsList = s.meds || [];
+        calculateCrCl();
+        refreshUnifiedTable();
+      }
+    }
+
+    function resetFullApp() {
+      sessionStorage.removeItem(STORAGE_KEY);
+      medicationsList = [];
+      document.getElementById("inpAge").value = "";
+      document.getElementById("chkFallRisk").checked = false;
+      document.getElementById("inpConditions").value = "";
+      document.getElementById("inpCreatinine").value = "";
+      document.getElementById("inpWeight").value = "";
+      document.getElementById("inpHeight").value = "";
+      document.getElementById("txtRawPrescription").value = "";
+      document.getElementById("filePdf").value = "";
+      calculateCrCl();
+      refreshUnifiedTable();
+      document.getElementById("screeningReportBox").classList.add("hidden");
+    }
+
+    async function uploadPdf(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/v1/prescription/extract-pdf", { method: "POST", body: fd });
+      if (res.ok) {
+        const data = await res.json();
+        pendingPdfMedications = data.medications || [];
+        if (pendingPdfMedications.length === 0) {
+          alert("Nenhum medicamento ativo detectado no PDF.");
+          return;
+        }
+        openPdfReviewModal();
+      }
+    }
+
+    function openPdfReviewModal() {
+      const list = document.getElementById("pdfExtractedChecklist");
+      list.innerHTML = "";
+      pendingPdfMedications.forEach((med, i) => {
+        list.innerHTML += `
+          <label class="flex items-center gap-2 p-1.5 hover:bg-slate-100 rounded cursor-pointer">
+            <input type="checkbox" id="pdfCheck_${i}" value="${med}" checked class="rounded text-cyan-600 focus:ring-0">
+            <span class="font-bold text-slate-700">${med}</span>
+          </label>
+        `;
+      });
+      togglePdfReviewModal(true);
+    }
+
+    function togglePdfReviewModal(show) {
+      const m = document.getElementById("pdfReviewModal");
+      if (show) m.classList.remove("hidden");
+      else m.classList.add("hidden");
+    }
+
+    function confirmPdfMedications() {
+      let count = 0;
+      pendingPdfMedications.forEach((med, i) => {
+        const chk = document.getElementById(`pdfCheck_${i}`);
+        if (chk && chk.checked) {
+          if (!medicationsList.some(item => item.name.toLowerCase() === med.toLowerCase())) {
+            medicationsList.push({ name: med, dose: "", route: "VO (Oral)", frequency: "" });
+            count++;
+          }
+        }
+      });
+      togglePdfReviewModal(false);
+      refreshUnifiedTable();
+      saveState();
+      alert(`${count} medicamento(s) confirmado(s) e inserido(s) na triagem!`);
+    }
+
+    function parseRawText() {
+      const raw = document.getElementById("txtRawPrescription").value;
+      if (!raw.trim()) return alert("Cole o texto da prescrição primeiro.");
+      const lines = raw.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean);
+      lines.forEach(l => {
+        medicationsList.push({ name: l, dose: "", route: "VO (Oral)", frequency: "" });
+      });
+      document.getElementById("txtRawPrescription").value = "";
+      refreshUnifiedTable();
+      saveState();
+    }
+
+    async function processCompleteScreening() {
+      if (medicationsList.length === 0) return alert("Insira ao menos um medicamento para avaliar.");
+      const ageVal = parseInt(document.getElementById("inpAge").value) || 0;
+      if (!ageVal) return alert("Informe a idade do paciente.");
+
+      const payload = {
+        age: ageVal,
+        sector: document.getElementById("selSector").value,
+        fall_risk: document.getElementById("chkFallRisk").checked,
+        conditions: document.getElementById("inpConditions").value.split(/[,]+/).map(c => c.trim()).filter(Boolean),
+        crcl_ml_min: calculatedCrCl,
+        crcl_notes: crclClinicalNote,
+        medications: medicationsList
+      };
+
+      const res = await fetch("/api/v1/screen", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      const box = document.getElementById("screeningReportBox");
+      const list = document.getElementById("reportAlertsList");
+      const badge = document.getElementById("reportBadgeSummary");
+
+      box.classList.remove("hidden");
+      badge.innerText = `${data.total_beers_alerts} Alertas Identificados`;
+      list.innerHTML = "";
+
+      if (data.alerts.length === 0) {
+        list.innerHTML = `
+          <div class="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-xs flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            Prescrição validada. Nenhum critério de Beers violado para o perfil clínico informado.
+          </div>
+        `;
+      } else {
+        data.alerts.forEach(a => {
+          const taperingHtml = a.tapering
+            ? `<div class="bg-amber-50/80 p-2.5 rounded border border-amber-200 mt-2">
+                 <strong class="text-amber-900 block text-[11px] uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                   <i data-lucide="activity" class="w-3.5 h-3.5 text-amber-700"></i> Plano Prático de Desprescrição (Tapering):
+                 </strong>
+                 <p class="text-amber-800 text-xs">${a.tapering}</p>
+               </div>`
+            : '';
+
+          list.innerHTML += `
+            <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 shadow-sm">
+              <div class="flex justify-between items-center font-bold">
+                <span class="text-rose-700 text-sm flex items-center gap-1.5">
+                  <i data-lucide="alert-octagon" class="w-4 h-4"></i> ${a.drug}
+                </span>
+                <span class="text-[10px] bg-slate-200 text-slate-800 px-2 py-0.5 rounded font-mono">${a.axis}</span>
+              </div>
+              <div class="text-slate-800"><strong>Conduta Recomendada:</strong> ${a.recommendation}</div>
+              <div class="text-slate-600 bg-white p-2 rounded border border-slate-100"><strong>Racional Clínico:</strong> ${a.rationale}</div>
+              ${taperingHtml}
+            </div>
+          `;
+        });
+      }
+      lucide.createIcons();
+      box.scrollIntoView({ behavior: "smooth" });
+    }
+  </script>
+</body>
+</html>
