@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FarmBeers — Manual Operacional e Clínico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #0a192f;
+      --secondary: #00c8f8;
+      --secondary-dark: #007791;
+      --navy-card: #0b2342;
+      --accent-danger: #991b1b;
+      --accent-danger-bg: #fef2f2;
+      --accent-warning: #92400e;
+      --accent-warning-bg: #fffbeb;
+      --accent-success: #166534;
+      --accent-success-bg: #f0fdf4;
+      --bg-desk: #091322;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg-desk);
+      background-image: radial-gradient(circle at 50% 10%, #172a45 0%, #091322 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 10px;
+    }
+
+    /* BARRA SUPERIOR EXECUTIVA */
+    .top-navbar {
+      width: 100%;
+      max-width: 210mm;
+      background: rgba(10, 25, 47, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(0, 200, 248, 0.25);
+      border-radius: 10px;
+      padding: 8px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+      z-index: 40;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-action {
+      background: var(--secondary-dark);
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-action:hover {
+      background: #0096ba;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+    }
+
+    .btn-outline:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--secondary);
+      color: #fff;
+    }
+
+    /* SUMÁRIO RETRÁTIL (DRAWER) */
+    .toc-drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 340px;
+      height: 100%;
+      background: #0a192f;
+      color: #ffffff;
+      z-index: 100;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 10px 0 30px rgba(0,0,0,0.6);
+      padding: 30px 24px;
+      overflow-y: auto;
+    }
+
+    .toc-drawer.open { transform: translateX(0); }
+
+    .toc-header {
+      font-family: 'Cinzel', serif;
+      font-size: 1.15rem;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .toc-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+    .toc-item {
+      padding: 11px 14px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toc-item:hover, .toc-item.active {
+      background: rgba(0, 200, 248, 0.15);
+      color: #ffffff;
+      border-left: 3px solid var(--secondary);
+    }
+
+    /* PÁGINAS A4 NO NAVEGADOR */
+    .a4-page {
+      width: 210mm;
+      height: 297mm;
+      background: #ffffff;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.45);
+      border-radius: 2px;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 18mm 18mm 14mm 18mm;
+      position: relative;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .a4-page.active {
+      display: flex;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+      margin-bottom: 12px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .page-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      padding-top: 5px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      overflow: visible;
+    }
+
+    /* PÁGINA 1: CAPA PURA E EXCLUSIVA */
+    .cover-page {
+      padding: 0 !important;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .cover-inner {
+      width: 100%;
+      height: 100%;
+      padding: 28mm 20mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      background: radial-gradient(circle at 50% 25%, #f8fafc 0%, #ffffff 100%);
+      box-sizing: border-box;
+    }
+
+    .cover-brand-box {
+      background: #091a2e;
+      border: 2px solid var(--secondary);
+      border-radius: 16px;
+      padding: 24px 36px;
+      box-shadow: 0 10px 25px rgba(9, 26, 46, 0.25);
+      margin-bottom: 18px;
+    }
+
+    .cover-title-group h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 2.1rem;
+      color: var(--primary);
+      letter-spacing: 2px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .cover-title-group h2 {
+      font-size: 1.02rem;
+      color: var(--secondary-dark);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 18px;
+    }
+
+    .cover-quote-box {
+      background: #f1f5f9;
+      border-left: 5px solid var(--secondary-dark);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin: 16px 0;
+      max-width: 580px;
+      text-align: center;
+      font-size: 0.94rem;
+      line-height: 1.65;
+      color: #334155;
+    }
+
+    .cover-quote-box strong {
+      color: var(--primary);
+    }
+
+    .cover-footer-note {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      max-width: 520px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    /* ELEMENTOS DE TEXTO E SEÇÕES */
+    h2.section-heading {
+      font-family: 'Cinzel', serif;
+      font-size: 1.15rem;
+      color: var(--primary);
+      margin-bottom: 6px;
+      border-bottom: 2px solid var(--secondary-dark);
+      padding-bottom: 4px;
+    }
+
+    h3.sub-heading {
+      font-size: 0.90rem;
+      color: #1e3a5f;
+      margin: 8px 0 4px 0;
+      font-weight: 700;
+    }
+
+    p {
+      font-size: 0.83rem;
+      line-height: 1.5;
+      color: #334155;
+      margin-bottom: 8px;
+      text-align: justify;
+    }
+
+    .callout {
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 8px 0;
+      font-size: 0.81rem;
+      line-height: 1.45;
+    }
+
+    .callout-navy {
+      background: #f1f5f9;
+      border-left: 4px solid var(--primary);
+      color: #1e293b;
+    }
+
+    .callout-alert {
+      background: var(--accent-danger-bg);
+      border-left: 4px solid var(--accent-danger);
+      color: #7f1d1d;
+    }
+
+    .callout-warning {
+      background: var(--accent-warning-bg);
+      border-left: 4px solid var(--accent-warning);
+      color: #78350f;
+    }
+
+    .callout-success {
+      background: var(--accent-success-bg);
+      border-left: 4px solid var(--accent-success);
+      color: #14532d;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 8px 0;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .card-title {
+      font-size: 0.83rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .formula-banner {
+      background: #091a2e;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 8px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 0.82rem;
+      margin: 8px 0;
+      border: 1px solid #1e293b;
+    }
+
+    .search-box {
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .search-box input {
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      font-size: 0.76rem;
+      width: 220px;
+      outline: none;
+    }
+
+    .search-box input:focus {
+      border-color: var(--secondary-dark);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.74rem;
+      margin: 4px 0;
+    }
+
+    table.data-table thead th {
+      background: #091a2e;
+      color: #ffffff;
+      padding: 5px 7px;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    table.data-table tbody td {
+      padding: 5px 7px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.3;
+    }
+
+    table.data-table tbody tr:nth-child(even) { background: #f8fafc; }
+
+    .tag-class {
+      display: inline-block;
+      font-weight: 700;
+      color: var(--secondary-dark);
+      font-size: 0.72rem;
+    }
+
+    .bottom-nav {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .page-indicator-text {
+      color: #94a3b8;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    /* REGRAS EXATAS DE IMPRESSÃO (SEM PÁGINAS EM BRANCO) */
+    @page {
+      size: A4 portrait;
+      margin: 0mm;
+    }
+
+    @media print {
+      html, body {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 210mm !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .top-navbar, .bottom-nav, .toc-drawer, .search-box {
+        display: none !important;
+      }
+
+      .a4-page {
+        display: flex !important;
+        visibility: visible !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        width: 210mm !important;
+        min-height: 297mm !important;
+        height: 297mm !important;
+        max-height: 297mm !important;
+        padding: 16mm 16mm 12mm 16mm !important;
+        box-sizing: border-box !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        overflow: hidden !important;
+      }
+
+      .page-body {
+        overflow: visible !important;
+      }
+
+      table.data-table, .card, .callout {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR EXECUTIVA -->
+  <header class="top-navbar">
+    <div class="brand-group">
+      <button class="btn-action btn-outline" onclick="toggleToc()">☰ Sumário</button>
+      
+      <!-- LOGO OFICIAL VETORIAL NO CANTO SUPERIOR ESQUERDO (SEM HOSPITAL MILITAR) -->
+      <div style="display: flex; align-items: center;">
+        <svg width="240" height="42" viewBox="0 0 340 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="56" rx="14" fill="#0b2342" stroke="#00c8f8" stroke-width="3"/>
+          <text x="30" y="38" font-family="'Inter', sans-serif" font-weight="800" font-size="24" fill="#00c8f8" text-anchor="middle">FB</text>
+          <text x="75" y="32" font-family="'Inter', sans-serif" font-weight="800" font-size="28" fill="#ffffff" letter-spacing="-0.5">Farm<tspan fill="#00c8f8">Beers</tspan></text>
+          <text x="75" y="50" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#00c8f8" letter-spacing="3.2">TRIAGEM FARMACÊUTICA</text>
+        </svg>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-action" onclick="window.print()">🖨️ Exportar Documento PDF</button>
+    </div>
+  </header>
+
+  <!-- SUMÁRIO RETRÁTIL (DRAWER) -->
+  <nav class="toc-drawer" id="tocDrawer">
+    <div class="toc-header">
+      <span>ÍNDICE DO MANUAL</span>
+      <button onclick="toggleToc()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+    </div>
+    <ul class="toc-list">
+      <li class="toc-item active" onclick="goToPage(1)">Capa • Identificação do Manual</li>
+      <li class="toc-item" onclick="goToPage(2)">1. Propósito Assistencial</li>
+      <li class="toc-item" onclick="goToPage(2)">2. Critérios Beers & Avaliação Renal</li>
+      <li class="toc-item" onclick="goToPage(3)">3. Fármacos Estratégicos (Classes 1 a 6)</li>
+      <li class="toc-item" onclick="goToPage(4)">3. Fármacos Estratégicos (Classes 7 a 12)</li>
+      <li class="toc-item" onclick="goToPage(5)">4. Passo a Passo da Triagem no Sistema</li>
+      <li class="toc-item" onclick="goToPage(5)">5. Comunicação Interprofissional SBAR</li>
+      <li class="toc-item" onclick="goToPage(5)">6. Segurança da Informação & LGPD</li>
+    </ul>
+  </nav>
+
+  <!-- PÁGINA 1: CAPA PURA E EXCLUSIVA (FOLHA A4) -->
+  <div class="a4-page cover-page active" id="page-1">
+    <div class="cover-inner">
+      
+      <div style="font-size: 0.85rem; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--secondary-dark);">
+        Diretriz de Farmácia Clínica Hospitalar
+      </div>
+
+      <!-- LOGO OFICIAL EM VETOR SVG AMPLIADO -->
+      <div class="cover-brand-box">
+        <svg width="340" height="70" viewBox="0 0 340 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="66" height="66" rx="16" fill="#07182c" stroke="#00a8cc" stroke-width="3.5"/>
+          <text x="35" y="44" font-family="'Inter', sans-serif" font-weight="800" font-size="28" fill="#00c8f8" text-anchor="middle">FB</text>
+          <text x="82" y="38" font-family="'Inter', sans-serif" font-weight="800" font-size="34" fill="#ffffff" letter-spacing="-0.5">Farm<tspan fill="#00c8f8">Beers</tspan></text>
+          <text x="84" y="58" font-family="'Inter', sans-serif" font-weight="700" font-size="14.5" fill="#00c8f8" letter-spacing="3.8">TRIAGEM FARMACÊUTICA</text>
+        </svg>
+      </div>
+
+      <!-- TÍTULOS E IDENTIFICAÇÃO DO MANUAL -->
+      <div class="cover-title-group">
+        <h1>MANUAL OPERACIONAL E CLÍNICO</h1>
+        <h2>Guia Prático do Farmacêutico Clínico • Suporte à Decisão na Farmacoterapia do Idoso</h2>
+      </div>
+
+      <!-- FRASE DE IMPACTO EM DESTAQUE -->
+      <div class="cover-quote-box">
+        "O <strong>FarmBeers</strong> fortalece a segurança do paciente idoso no ambiente hospitalar, atuando na prevenção de danos evitáveis causados por medicamentos, em total conformidade com as diretrizes da <strong>ANVISA (RDC nº 36/2013)</strong> e da <strong>OMS</strong>."
+      </div>
+
+      <!-- NOTA DE ORIGEM CIENTÍFICA DA PESQUISA UPI -->
+      <div class="cover-footer-note">
+        <strong>Origem e Base Epidemiológica:</strong> Fruto da pesquisa aplicada <em>"FarmBeers UPI: Instrumento de Triagem Farmacêutica para Identificação de Pacientes Idosos com Risco Farmacoterapêutico em um Hospital Militar"</em>, espelhando a prevalência real de consumo e riscos da enfermaria.
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PÁGINA 2: PROPÓSITO ASSISTENCIAL E FUNDAMENTOS CLÍNICOS -->
+  <div class="a4-page" id="page-2">
+    <div class="page-header">
+      <span>FarmBeers • Manual Operacional e Clínico</span>
+      <span>Seções 1 & 2 • Propósito Assistencial e Fundamentos</span>
+    </div>
+    <div class="page-body">
+      <h2 class="section-heading">1. Propósito Assistencial</h2>
+      <p>
+        O <strong>FarmBeers</strong> foi desenvolvido para otimizar a rotina de triagem diária do farmacêutico clínico à beira do leito. Na correria do plantão hospitalar, com múltiplos pacientes polimedicados, o sistema atua como uma salvaguarda silenciosa, permitindo identificar com rapidez riscos potenciais e interações cumulativas.
+      </p>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🛡️ Apoio Cognitivo, Jamais Punitivo</div>
+          <p style="font-size:0.78rem; margin:0;">A ferramenta não existe para confrontar a equipe médica ou auditar erros. Ela gera argumentos fundamentados para subsidiar intervenções farmacêuticas construtivas.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">🩺 Soberania do Prescritor</div>
+          <p style="font-size:0.78rem; margin:0;">Cada paciente representa uma trajetória clínica singular. A decisão final de manter um medicamento cabe ao médico assistente quando a relação risco/benefício for favorável.</p>
+        </div>
+      </div>
+
+      <h2 class="section-heading" style="margin-top: 10px;">2. Critérios AGS Beers 2023 & Avaliação Renal</h2>
+      <p>
+        O sistema adota os Critérios Beers 2023 da <em>American Geriatrics Society</em> para pacientes com <strong>idade &ge; 65 anos</strong> internados na enfermaria ou UTI.
+      </p>
+
+      <div class="callout callout-alert">
+        <strong>⚠️ Exceção Obrigatória:</strong> As restrições de Beers <strong>NÃO se aplicam a pacientes em cuidados paliativos exclusivos ou em fase final de vida</strong>. Nestes casos, o conforto sintomático e o controle da dor com opioides e sedativos sobrepõem-se aos riscos crônicos.
+      </div>
+
+      <h3 class="sub-heading">Estimativa da Função Renal (Cockcroft-Gault)</h3>
+      <div class="formula-banner">
+        ClCr (mL/min) = [ (140 - Idade) × Peso (kg) ] / [ 72 × Creatinina Sérica (mg/dL) ] (× 0,85 se feminino)
+      </div>
+
+      <div class="callout callout-warning">
+        <strong>⚠️ Atenção à Sarcopenia (Creatinina &lt; 0,6 mg/dL):</strong> Idosos muito idosos (80+) acamados com perda severa de massa muscular produzem creatinina muito baixa (0,3 ou 0,4 mg/dL). O cálculo direto gera um ClCr <em>falsamente excelente</em>. <strong>Conduta:</strong> Recomenda-se arredondar a creatinina sérica para 0,6 mg/dL antes do cálculo para prevenir superdosagens tóxicas de fármacos com depuração renal.
+      </div>
+
+      <h3 class="sub-heading">Carga Anticolinérgica Cumulativa</h3>
+      <p>
+        O risco na enfermaria raramente decorre de um medicamento isolado, mas sim do <strong>efeito somatório</strong> de fármacos com baixa/moderada atividade anticolinérgica administrados em conjunto (ex.: antiemético + relaxante muscular + antidepressivo), aumentando expressivamente o risco de <em>delirium</em> agudo, retenção urinária e quedas graves.
+      </p>
+    </div>
+    <div class="page-footer">
+      <span>Guia Prático do Farmacêutico Clínico</span>
+      <span>Página 2</span>
+    </div>
+  </div>
+
+  <!-- PÁGINA 3: CATÁLOGO DOS 72 FÁRMACOS (PARTE 1) -->
+  <div class="a4-page" id="page-3">
+    <div class="page-header">
+      <span>FarmBeers • Manual Operacional e Clínico</span>
+      <span>Seção 3 • Catálogo Terapêutico (Classes 1 a 6)</span>
+    </div>
+    <div class="page-body">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <h2 class="section-heading" style="margin-bottom:0;">3. Relação dos 72 Fármacos Estratégicos</h2>
+        <div class="search-box">
+          <input type="text" id="drugSearch1" placeholder="🔍 Filtrar nesta página..." onkeyup="filterTable('drugSearch1', 'tablePart1')">
+        </div>
+      </div>
+      <p style="margin-top:4px;">
+        Medicamentos mapeados a partir da realidade assistencial da enfermaria (UPI), priorizados pelo impacto clínico direto no idoso:
+      </p>
+
+      <table class="data-table" id="tablePart1">
+        <thead>
+          <tr>
+            <th style="width: 28%;">Classe & Princípios Ativos</th>
+            <th style="width: 38%;">Mecanismo de Risco no Idoso</th>
+            <th style="width: 34%;">Sugestão / Alternativa Prática</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag-class">1. Benzodiazepínicos & Drogas Z</span><br>Alprazolam, Bromazepam, Clobazam, Clonazepam, Diazepam, Flurazepam, Lorazepam, Midazolam, Nitrazepam, Zolpidem, Zopiclona</td>
+            <td>Acúmulo lipofílico e lentificação psicomotora. Sedação residual diurna, instabilidade de marcha, quedas com fraturas e <em>delirium</em>.</td>
+            <td>Descontinuação gradual (*desprescrição*). Para insônia hospitalar: higiene do sono, melatonina ou Trazodona (25-50 mg à noite).</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">2. Relaxantes Musculares</span><br>Carisoprodol, Ciclobenzaprina, Orfenadrina, Tizanidina</td>
+            <td>Potente carga anticolinérgica e sedação pronunciada. Pouca eficácia comprovada na dor crônica com risco aumentado de quedas.</td>
+            <td>Dipirona, Paracetamol, fisioterapia motora precoce e compressas mornas locais.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">3. Anticolinérgicos & Anti-H1</span><br>Prometazina, Dimenidrinato, Dexclorfeniramina, Hidroxizina, Meclizina, Oxibutinina, Tolterodina, Biperideno, Ciproheptadina</td>
+            <td>Bloqueio muscarínico: boca seca, obstipação severa, retenção urinária aguda, piora de glaucoma e confusão mental aguda.</td>
+            <td>Para alergias: anti-histamínicos de 2ª geração (Loratadina). Para bexiga hiperativa: Mirabegrona ou medidas comportamentais.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">4. Antipsicóticos</span><br>Haloperidol, Clorpromazina, Levomepromazina, Olanzapina, Quetiapina, Risperidona, Tioridazina</td>
+            <td>Aumento da mortalidade e risco de AVE em idosos com demência; hipotensão ortostática e parkinsonismo iatrogênico.</td>
+            <td>Manejo ambiental não farmacológico da agitação. Se estritamente necessário, usar a menor dose eficaz pelo menor tempo possível.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">5. Antidepressivos Tricíclicos</span><br>Amitriptilina, Clomipramina, Imipramina, Nortriptilina, Paroxetina</td>
+            <td>Ação anticolinérgica marcante, arritmias ventriculares por prolongamento do intervalo QT e sedação excessiva.</td>
+            <td>Substituir por ISRS de melhor perfil no idoso: Sertralina (25-50 mg) ou Escitalopram (10 mg).</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">6. Anti-inflamatórios (AINEs)</span><br>Diclofenaco, Cetoprofeno, Ibuprofeno, Indometacina, Meloxicam, Naproxeno, Piroxicam, Cetorolaco</td>
+            <td>Inibição das prostaglandinas vasodilatadoras renais: Lesão Renal Aguda, descompensação da ICC e sangramento digestivo alto.</td>
+            <td>Dipirona ou Paracetamol. Se indispensável, limitar uso ao menor período possível (máximo 3-5 dias) associado a protetor gástrico.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="page-footer">
+      <span>Guia Prático do Farmacêutico Clínico</span>
+      <span>Página 3</span>
+    </div>
+  </div>
+
+  <!-- PÁGINA 4: CATÁLOGO DOS 72 FÁRMACOS (PARTE 2) -->
+  <div class="a4-page" id="page-4">
+    <div class="page-header">
+      <span>FarmBeers • Manual Operacional e Clínico</span>
+      <span>Seção 3 • Catálogo Terapêutico (Classes 7 a 12)</span>
+    </div>
+    <div class="page-body">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <h2 class="section-heading" style="margin-bottom:0;">3. Relação dos 72 Fármacos (Continuação)</h2>
+        <div class="search-box">
+          <input type="text" id="drugSearch2" placeholder="🔍 Filtrar nesta página..." onkeyup="filterTable('drugSearch2', 'tablePart2')">
+        </div>
+      </div>
+
+      <table class="data-table" id="tablePart2" style="margin-top:6px;">
+        <thead>
+          <tr>
+            <th style="width: 28%;">Classe & Princípios Ativos</th>
+            <th style="width: 38%;">Mecanismo de Risco no Idoso</th>
+            <th style="width: 34%;">Sugestão / Alternativa Prática</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag-class">7. Trato Gastrointestinal</span><br>Metoclopramida, Cimetidina, Omeprazol, Pantoprazol, Esomeprazol, Lansoprazol</td>
+            <td>Metoclopramida: bloqueio D2 com tremores e discinesia tardia irreversível. IBPs contínuos (> 8 semanas): infecção por <em>C. difficile</em> e osteopenia.</td>
+            <td>Ondansetrona para controle de náuseas. Desprescrição planejada de IBPs quando ausente o sangramento gastrointestinal ativo.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">8. Cardiovasculares & Digitálicos</span><br>Clonidina, Metildopa, Digoxina, Doxazosina, Prazosina, Amiodarona, Diltiazem, Verapamil</td>
+            <td>Clonidina/Metildopa: bradicardia severa, hipotensão ortostática súbita e síncope. Digoxina: arritmias tóxicas na disfunção renal senil.</td>
+            <td>Anti-hipertensivos de 1ª linha (BRA, IECA, Anlodipino em titulação lenta). Digoxina: dosagem sérica e teto de 0,125 mg/dia.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">9. Hipoglicemiantes (Sulfonilureias)</span><br>Glibenclamida, Glimepirida</td>
+            <td>Meia-vida longa e excreção renal prejudicada de metabólitos ativos, precipitando hipoglicemias graves, prolongadas e fatais.</td>
+            <td>Substituir por Inibidores da DPP-4 (Linagliptina/Vildagliptina) ou esquemas estruturados de insulina com monitorização glicêmica.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">10. Ajuste Renal Crítico & Antimicrobianos</span><br>Metformina, Espironolactona, Nitrofurantoína, Bactrim, Gabapentina, Pregabalina</td>
+            <td>Acúmulo tóxico com ClCr &lt; 30 ou 50 mL/min: acidose láctica (Metformina), hipercalemia fatal (Espironolactona) e mioclonias (Pregabalina).</td>
+            <td>Ajuste milimétrico de dose segundo Cockcroft-Gault diário e controle laboratorial frequente de potássio e escórias renais.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">11. Opioides</span><br>Meperidina, Tramadol, Morfina</td>
+            <td>Meperidina: o metabólito normeperidina precipita convulsões graves. Tramadol/Morfina: constipação severa, delírio e apneia.</td>
+            <td>Meperidina formalmente contraindicada. Para dor severa: opioides em dose 50% reduzida e prescrição preventiva de laxante osmótico.</td>
+          </tr>
+          <tr>
+            <td><span class="tag-class">12. Anticoagulantes (MAVs)</span><br>Varfarina, Rivaroxabana</td>
+            <td>Margem terapêutica estreita. Flutuação de RNI no idoso frágil e alto risco hemorrágico por acúmulo de DOACs na disfunção renal.</td>
+            <td>Ajuste da Rivaroxabana para 15 mg se ClCr 15-49 mL/min; suspensão se &lt; 15 mL/min. Monitorização rigorosa de hemoglobina.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="page-footer">
+      <span>Guia Prático do Farmacêutico Clínico</span>
+      <span>Página 4</span>
+    </div>
+  </div>
+
+  <!-- PÁGINA 5: OPERAÇÃO, SBAR E LGPD -->
+  <div class="a4-page" id="page-5">
+    <div class="page-header">
+      <span>FarmBeers • Manual Operacional e Clínico</span>
+      <span>Seções 4, 5 & 6 • Operação, SBAR e LGPD</span>
+    </div>
+    <div class="page-body">
+      <h2 class="section-heading">4. Passo a Passo da Triagem no Sistema</h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">1. Dados do Leito & Fatores de Risco</div>
+          <p style="font-size:0.77rem; margin:0;">Insira idade (&ge; 65), peso e setor (UPI ou UTI). Marque comorbidades ativas (Demência, Insuficiência Cardíaca, Risco de Queda).</p>
+        </div>
+        <div class="card">
+          <div class="card-title">2. Creatinina & Filtração Renal</div>
+          <p style="font-size:0.77rem; margin:0;">Insira a creatinina sérica recente. O sistema calcula a depuração de Cockcroft-Gault e alerta para o risco de sarcopenia.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">3. Leitura da Prescrição</div>
+          <p style="font-size:0.77rem; margin:0;">Anexe o PDF ou cole o texto. O motor reconhece princípios ativos e marcas comerciais automaticamente.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">4. Avaliação & Parecer</div>
+          <p style="font-size:0.77rem; margin:0;">Interprete os alertas cromáticos (Vermelho: Risco Crítico / MAV; Laranja: Tabela 2 / Ajuste Renal; Amarelo: Carga Anticolinérgica).</p>
+        </div>
+      </div>
+
+      <h2 class="section-heading" style="margin-top: 8px;">5. Comunicação Interprofissional SBAR</h2>
+      <p style="margin-bottom: 4px;">Estruture sua conversa com o médico prescritor de forma rápida e assertiva:</p>
+      <div class="callout callout-navy" style="font-size: 0.78rem; padding: 6px 10px; margin: 4px 0 6px 0;">
+        • <strong>S (Situação):</strong> "Doutor, estou revisando a prescrição do leito 12 da UPI e encontrei um medicamento de risco com a função renal de hoje."<br>
+        • <strong>B (Breve Histórico):</strong> "O paciente tem 82 anos, histórico de IC e a creatinina subiu para 1,8 mg/dL (ClCr 22 mL/min)."<br>
+        • <strong>A (Avaliação):</strong> "Ele está recebendo Espironolactona junto com Enalapril, com alto risco de hipercalemia arritmogênica."<br>
+        • <strong>R (Recomendação):</strong> "Sugiro suspender a Espironolactona e monitorar os eletrólitos amanhã de manhã. O senhor concorda?"
+      </div>
+
+      <h2 class="section-heading" style="margin-top: 6px;">6. Segurança da Informação e Conformidade LGPD</h2>
+      <div class="callout callout-success" style="font-size: 0.78rem; padding: 6px 10px; margin: 4px 0;">
+        <strong>🔒 Privacy by Design & Anonimização Imediata (Lei nº 13.709/2018):</strong><br>
+        Ao anexar a prescrição hospitalar (seja em PDF ou texto colado), o FarmBeers executa um filtro imediato: <strong>o nome do paciente, número do leito e prontuário são sumariamente descartados</strong> antes de qualquer processamento ou gravação. É tecnicamente impossível reidentificar o paciente civil no banco de dados, assegurando sigilo profissional absoluto.
+      </div>
+    </div>
+    <div class="page-footer">
+      <span>Guia Prático do Farmacêutico Clínico</span>
+      <span>Página 5</span>
+    </div>
+  </div>
+
+  <!-- NAVEGADOR DE RODAPÉ -->
+  <div class="bottom-nav">
+    <button class="btn-action btn-outline" id="prevBtnBottom" onclick="changePage(-1)">← Página Anterior</button>
+    <div class="page-indicator-text" id="pageIndicator">Página 1 de 5</div>
+    <button class="btn-action" id="nextBtnBottom" onclick="changePage(1)">Próxima Página →</button>
+  </div>
+
+  <script>
+    let currentPage = 1;
+    const totalPages = 5;
+
+    function updatePageDisplay() {
+      for (let i = 1; i <= totalPages; i++) {
+        const pageEl = document.getElementById(`page-${i}`);
+        if (pageEl) {
+          if (i === currentPage) {
+            pageEl.classList.add('active');
+          } else {
+            pageEl.classList.remove('active');
+          }
+        }
+      }
+
+      document.querySelectorAll('.toc-item').forEach((item, idx) => {
+        item.classList.remove('active');
+      });
+
+      document.getElementById('pageIndicator').innerText = `Página ${currentPage} de ${totalPages}`;
+      document.getElementById('prevBtnBottom').disabled = (currentPage === 1);
+      document.getElementById('nextBtnBottom').disabled = (currentPage === totalPages);
+    }
+
+    function changePage(delta) {
+      const next = currentPage + delta;
+      if (next >= 1 && next <= totalPages) {
+        currentPage = next;
+        updatePageDisplay();
+      }
+    }
+
+    function goToPage(pageNum) {
+      if (pageNum >= 1 && pageNum <= totalPages) {
+        currentPage = pageNum;
+        updatePageDisplay();
+        toggleToc();
+      }
+    }
+
+    function toggleToc() {
+      document.getElementById('tocDrawer').classList.toggle('open');
+    }
+
+    function filterTable(inputId, tableId) {
+      const input = document.getElementById(inputId);
+      const filter = input.value.toLowerCase();
+      const rows = document.querySelectorAll(`#${tableId} tbody tr`);
+
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') changePage(1);
+      if (e.key === 'ArrowLeft') changePage(-1);
+      if (e.key === 'Escape') document.getElementById('tocDrawer').classList.remove('open');
+    });
+
+    updatePageDisplay();
+  </script>
+</body>
+</html>
