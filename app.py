@@ -15,7 +15,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, 
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 import pdfplumber
 
-# Importação da base farmacológica
+# Importação da base farmacológica enriquecida
 from clinical_rules import TABLE_2_GENERAL, TABLE_6_RENAL, TABLE_3_DISEASE_DRUG, TABLE_5_INTERACTIONS
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmabeers.db")
@@ -28,7 +28,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # =========================================================================
-# MODELOS DE DADOS
+# MODELOS DE DADOS (BANCO DE DADOS)
 # =========================================================================
 class User(Base):
     __tablename__ = "users"
@@ -65,7 +65,7 @@ def _hash_password(password: str, salt: str) -> str:
     return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
 
 def init_default_users():
-    """Garante a existência dos três usuários: admin, farmaceutico e Teste."""
+    """Garante a existência dos usuários requisitados: admin, farmaceutico e Teste."""
     db = SessionLocal()
     try:
         users_to_seed = [
@@ -86,7 +86,7 @@ def init_default_users():
 init_default_users()
 
 # =========================================================================
-# SCHEMAS PYDANTIC
+# SCHEMAS DA API (PYDANTIC)
 # =========================================================================
 class LoginRequest(BaseModel):
     username: str
@@ -151,7 +151,7 @@ def _norm(text: str) -> str:
     return clean.lower().strip()
 
 def _match_drug(text_norm: str, drug_name: str, aliases: list) -> bool:
-    """Verifica correspondência por fronteiras de palavra exatas (\b)."""
+    """Verifica correspondência por palavra inteira usando fronteiras regex (\b)."""
     targets = [drug_name.lower()] + [a.lower() for a in aliases]
     for target in targets:
         pattern = r'\b' + re.escape(target) + r'\b'
@@ -168,11 +168,12 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
         norm_conditions.append("queda")
         norm_conditions.append("risco de queda")
 
+    # 1. Avaliação individual dos medicamentos prescritos
     for med in payload.medications:
         nmed = _norm(med.name)
         row_alerts = []
 
-        # Tabela 2: Inapropriados Gerais
+        # Tabela 2: Inapropriados Gerais (Alerta Vermelho)
         for item in TABLE_2_GENERAL:
             if _match_drug(nmed, item["drug"], item.get("aliases", [])):
                 alert = BeersAlert(
@@ -187,7 +188,7 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
                 alerts.append(alert)
                 row_alerts.append(alert)
 
-        # Tabela 6: Ajuste Renal
+        # Tabela 6: Ajuste Renal Obrigatório (Alerta Condicional)
         for item in TABLE_6_RENAL:
             if _match_drug(nmed, item["drug"], item.get("aliases", [])):
                 cutoff = item.get("cutoff_clcr", 60.0)
@@ -204,7 +205,7 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
                     alerts.append(alert)
                     row_alerts.append(alert)
 
-        # Tabela 3: Cruzamento Fármaco-Doença
+        # Tabela 3: Cruzamento Fármaco-Doença individual
         for rule in TABLE_3_DISEASE_DRUG:
             matched_cond = any(any(c_term in cond for c_term in rule["conditions"]) for cond in norm_conditions)
             if matched_cond:
@@ -216,12 +217,13 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
                         category="Condição Clínica Associada",
                         recommendation=rule["rec"],
                         rationale=rule["rat"],
-                        tapering="Revisar prescrição considerando o histórico do paciente.",
+                        tapering="Revisar prescrição com base no histórico clínico informado.",
                         severity="Alta"
                     )
                     alerts.append(alert)
                     row_alerts.append(alert)
 
+        # Configuração da linha visual da tabela
         dose_info = f"{med.dose or ''} {med.route or ''} {med.frequency or ''}".strip()
         if row_alerts:
             primary = row_alerts[0]
@@ -245,7 +247,7 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
                 tapering=None
             ))
 
-    # Tabela 5: Interações Críticas Duplas
+    # 2. Avaliação de Interações Medicamentosas Duplas Críticas (Tabela 5)
     all_meds_text = [_norm(m.name) for m in payload.medications]
     for inter in TABLE_5_INTERACTIONS:
         group_a, group_b = inter["pair"]
@@ -259,7 +261,7 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
                 category="Interação Medicamentosa",
                 recommendation=inter["rec"],
                 rationale=inter["rat"],
-                tapering="Substituir ao menos um dos agentes por alternativa de menor risco respiratório/hemorrágico.",
+                tapering="Substituir ao menos um dos fármacos por opção analgésica/ansiolítica de menor risco conjunto.",
                 severity="Alta"
             ))
 
@@ -277,7 +279,7 @@ def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
 # =========================================================================
 # APLICAÇÃO FASTAPI
 # =========================================================================
-app = FastAPI(title="FarmBeers - Triagem Hospitalar AGS Beers 2023", version="2.3.0")
+app = FastAPI(title="FarmBeers - Triagem Hospitalar AGS Beers 2023", version="2.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -392,6 +394,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 def screen_prescription(payload: ScreeningPayload, db: Session = Depends(get_db)):
     result = evaluate_beers(payload)
     
+    # Registro de auditoria para o painel CFT
     identified = [a.drug for a in result.alerts]
     log_entry = AuditLog(
         operator_username="farmaceutico",
@@ -423,6 +426,7 @@ async def extract_prescription_pdf(file: UploadFile = File(...)):
     lines = extracted_text.splitlines()
     detected_medications = []
 
+    # Construção do vocabulário de varredura ativa
     targets = []
     for item in TABLE_2_GENERAL:
         targets.append(item["drug"])
@@ -433,6 +437,7 @@ async def extract_prescription_pdf(file: UploadFile = File(...)):
 
     for line in lines:
         nline = _norm(line)
+        # Filtro de segurança: ignora frases de negação
         if any(neg in nline for neg in ["nega uso", "sem uso de", "alergia a", "nao faz uso", "suspenso"]):
             continue
         
@@ -444,7 +449,7 @@ async def extract_prescription_pdf(file: UploadFile = File(...)):
 
     return {"medications": detected_medications}
 
-# --- INDICADORES CFT (ADMIN) ---
+# --- INDICADORES CLÍNICOS CFT (ADMIN) ---
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
     year: int = Query(2026),
@@ -465,6 +470,7 @@ def get_metrics(
     count_uti = sum(1 for l in logs if "UTI" in l.sector)
     total_alerts = sum(l.total_beers_alerts for l in logs)
 
+    # Top 5 medicamentos de Beers mais prevalentes
     drug_counts = {}
     for l in logs:
         if isinstance(l.identified_drugs, list):
