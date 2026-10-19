@@ -1,7 +1,11 @@
+# -*- coding: utf-8 -*-
+"""
+FarmBeers Web API - Servidor Principal FastAPI + PostgreSQL
+Persistência Permanente de Triagens e Gestão de Contas CFT
+"""
 import os
 import io
 import datetime
-import unicodedata
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse
@@ -11,65 +15,18 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
-# Importação protegida das regras clínicas
 import clinical_rules
 
-def run_beers_evaluation(medications, age, fall_risk, conditions, crcl):
-    if hasattr(clinical_rules, "evaluate_patient_beers"):
-        return clinical_rules.evaluate_patient_beers(
-            medications=medications,
-            age=age,
-            fall_risk=fall_risk,
-            conditions=conditions,
-            crcl=crcl
-        )
-    elif hasattr(clinical_rules, "evaluate_prescription"):
-        return clinical_rules.evaluate_prescription(
-            medications=medications,
-            age=age,
-            fall_risk=fall_risk,
-            conditions=conditions,
-            crcl=crcl
-        )
-    return []
-
-def normalize_text(text: str) -> str:
-    if not text:
-        return ""
-    text = unicodedata.normalize("NFD", text.lower())
-    return "".join(c for c in text if unicodedata.category(c) != "Mn").strip()
-
-def match_drug_name(name: str) -> Optional[str]:
-    if hasattr(clinical_rules, "lookup_hospital_drug"):
-        res = clinical_rules.lookup_hospital_drug(name)
-        if res:
-            return res
-    if hasattr(clinical_rules, "normalize_drug_name"):
-        res = clinical_rules.normalize_drug_name(name)
-        if res:
-            return res
-
-    # Busca alternativa nos dicionários nativos de clinical_rules
-    clean_target = normalize_text(name)
-    if hasattr(clinical_rules, "DRUG_DATABASE"):
-        for drug_key in clinical_rules.DRUG_DATABASE.keys():
-            if normalize_text(drug_key) == clean_target:
-                return drug_key
-            if hasattr(clinical_rules, "DRUG_SYNONYMS"):
-                synonyms = clinical_rules.DRUG_SYNONYMS.get(drug_key, [])
-                for s in synonyms:
-                    if normalize_text(s) == clean_target:
-                        return drug_key
-    return name
-
 # ==============================================================================
-# CONFIGURAÇÃO DO BANCO DE DADOS (POSTGRESQL OU SQLITE FALLBACK)
+# CONFIGURAÇÃO DE CONEXÃO COM O BANCO DE DADOS POSTGRESQL DO RENDER
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 
+# Ajuste automático do prefixo do Render
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Conexão compatível (ignora check_same_thread quando conectado ao PostgreSQL)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
@@ -77,7 +34,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # ==============================================================================
-# MODELOS DE PERSISTÊNCIA (ORM)
+# MODELOS DE DADOS RELACIONAIS (ORM)
 # ==============================================================================
 class User(Base):
     __tablename__ = "users"
@@ -104,10 +61,11 @@ class ScreeningAlertRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     screening_id = Column(Integer, ForeignKey("screenings.id"))
     drug_name = Column(String(100), nullable=False)
-    axis = Column(String(50), nullable=False)
-    recommendation = Column(String(500), nullable=False)
+    axis = Column(String(100), nullable=False)
+    recommendation = Column(String(1000), nullable=False)
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
+# Criação automática de tabelas na inicialização do serviço
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -117,9 +75,7 @@ def get_db():
     finally:
         db.close()
 
-# ==============================================================================
-# INICIALIZAÇÃO DE USUÁRIOS PADRÃO
-# ==============================================================================
+# Criação automática dos logins padrão se o banco estiver vazio
 def init_default_users():
     db = SessionLocal()
     try:
@@ -140,9 +96,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# APLICAÇÃO FASTAPI
+# INICIALIZAÇÃO FASTAPI
 # ==============================================================================
-app = FastAPI(title="FarmBeers API", version="2.5.0")
+app = FastAPI(title="FarmBeers System API", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -153,7 +109,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# SCHEMAS PYDANTIC
+# ESQUEMAS DE REQUISIÇÃO (PYDANTIC)
 # ==============================================================================
 class LoginRequest(BaseModel):
     username: str
@@ -175,15 +131,15 @@ class MedicationInput(BaseModel):
 
 class ScreeningPayload(BaseModel):
     age: int
-    sector: str
-    fall_risk: bool
-    conditions: List[str]
+    sector: str = "UPI (Enfermaria)"
+    fall_risk: bool = False
+    conditions: List[str] = []
     crcl_ml_min: Optional[float] = None
     crcl_notes: Optional[str] = ""
     medications: List[MedicationInput]
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO E PRESENÇA
+# ROTAS DE AUTENTICAÇÃO E PRESENÇA EM TEMPO REAL
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -214,7 +170,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS (ADMIN)
+# GESTÃO DE USUÁRIOS
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -240,7 +196,7 @@ def list_users(db: Session = Depends(get_db)):
 def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
     exists = db.query(User).filter(User.username == payload.username).first()
     if exists:
-        raise HTTPException(status_code=400, detail="Nome de usuário já existe.")
+        raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
     new_u = User(
         username=payload.username,
         password=payload.password,
@@ -275,7 +231,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# INDICADORES CLÍNICOS CFT (ADMIN)
+# RELATÓRIOS E INDICADORES CFT
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
@@ -313,13 +269,14 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# MOTOR DE TRIAGEM FARMBEERS
+# MOTOR DE PROCESSAMENTO DE TRIAGEM FARMBEERS
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     med_names = [m.name for m in payload.medications]
     
-    alerts = run_beers_evaluation(
+    # Processa os alertas clínicos com tolerância total a sinônimos
+    alerts = clinical_rules.evaluate_patient_beers(
         medications=med_names,
         age=payload.age,
         fall_risk=payload.fall_risk,
@@ -327,14 +284,23 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-    alert_map = {a["drug"].strip().lower(): a for a in alerts}
+    alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts}
     
     med_rows = []
     for m in payload.medications:
-        canonical = match_drug_name(m.name)
-        k = (canonical or m.name).strip().lower()
-        if k in alert_map:
-            matched = alert_map[k]
+        canonical = clinical_rules.identify_drug_canonical(m.name)
+        matched = None
+        if canonical:
+            c_key = canonical.strip().lower()
+            if c_key in alert_by_canonical:
+                matched = alert_by_canonical[c_key]
+            else:
+                for k, v in alert_by_canonical.items():
+                    if k in c_key or c_key in k:
+                        matched = v
+                        break
+
+        if matched:
             med_rows.append({
                 "name": m.name,
                 "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
@@ -389,20 +355,30 @@ async def extract_pdf(file: UploadFile = File(...)):
                 text = page.extract_text()
                 if not text:
                     continue
-                words = text.split()
-                for w in words:
-                    clean = w.strip(".,;:()[]{}").strip()
-                    if len(clean) >= 3:
-                        matched = match_drug_name(clean)
-                        if matched and matched != clean:
-                            found_drugs.add(matched)
+                lines = text.split("\n")
+                for line in lines:
+                    line_clean = line.strip()
+                    if not line_clean:
+                        continue
+                    # Tenta identificar o fármaco na linha completa
+                    matched = clinical_rules.identify_drug_canonical(line_clean)
+                    if matched:
+                        found_drugs.add(matched.capitalize())
+                    else:
+                        # Tenta por palavras individuais
+                        for w in line_clean.split():
+                            w_clean = w.strip(".,;:()[]{}")
+                            if len(w_clean) >= 4:
+                                m_word = clinical_rules.identify_drug_canonical(w_clean)
+                                if m_word:
+                                    found_drugs.add(m_word.capitalize())
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar PDF: {str(e)}")
 
     return {"medications": sorted(list(found_drugs))}
 
 # ==============================================================================
-# FRONTEND ESTÁTICO NATIVO
+# CARREGAMENTO ESTÁTICO DO FRONTEND
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -410,4 +386,3 @@ def read_root():
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>FarmBeers Online. Arquivo index.html não localizado.</h1>"
-    
