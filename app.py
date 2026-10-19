@@ -1,27 +1,75 @@
 import os
 import io
 import datetime
+import unicodedata
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
-from clinical_rules import evaluate_patient_beers, lookup_hospital_drug
+# Importação protegida das regras clínicas
+import clinical_rules
+
+def run_beers_evaluation(medications, age, fall_risk, conditions, crcl):
+    if hasattr(clinical_rules, "evaluate_patient_beers"):
+        return clinical_rules.evaluate_patient_beers(
+            medications=medications,
+            age=age,
+            fall_risk=fall_risk,
+            conditions=conditions,
+            crcl=crcl
+        )
+    elif hasattr(clinical_rules, "evaluate_prescription"):
+        return clinical_rules.evaluate_prescription(
+            medications=medications,
+            age=age,
+            fall_risk=fall_risk,
+            conditions=conditions,
+            crcl=crcl
+        )
+    return []
+
+def normalize_text(text: str) -> str:
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFD", text.lower())
+    return "".join(c for c in text if unicodedata.category(c) != "Mn").strip()
+
+def match_drug_name(name: str) -> Optional[str]:
+    if hasattr(clinical_rules, "lookup_hospital_drug"):
+        res = clinical_rules.lookup_hospital_drug(name)
+        if res:
+            return res
+    if hasattr(clinical_rules, "normalize_drug_name"):
+        res = clinical_rules.normalize_drug_name(name)
+        if res:
+            return res
+
+    # Busca alternativa nos dicionários nativos de clinical_rules
+    clean_target = normalize_text(name)
+    if hasattr(clinical_rules, "DRUG_DATABASE"):
+        for drug_key in clinical_rules.DRUG_DATABASE.keys():
+            if normalize_text(drug_key) == clean_target:
+                return drug_key
+            if hasattr(clinical_rules, "DRUG_SYNONYMS"):
+                synonyms = clinical_rules.DRUG_SYNONYMS.get(drug_key, [])
+                for s in synonyms:
+                    if normalize_text(s) == clean_target:
+                        return drug_key
+    return name
 
 # ==============================================================================
-# CONFIGURAÇÃO DO BANCO DE DADOS (POSTGRESQL OU SQLITE DE FALLBACK)
+# CONFIGURAÇÃO DO BANCO DE DADOS (POSTGRESQL OU SQLITE FALLBACK)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 
-# Corrige prefixo legado do Render (postgres:// -> postgresql://)
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# SQLite exige check_same_thread=False; PostgreSQL não aceita este argumento
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
@@ -36,7 +84,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     password = Column(String(100), nullable=False)
-    role = Column(String(20), default="pharmacist")  # 'admin' ou 'pharmacist'
+    role = Column(String(20), default="pharmacist")
     is_active = Column(Boolean, default=True)
     last_ping = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -135,7 +183,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput]
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO E PRESENÇA EM TEMPO REAL
+# ROTAS DE AUTENTICAÇÃO E PRESENÇA
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -271,7 +319,7 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     med_names = [m.name for m in payload.medications]
     
-    alerts = evaluate_patient_beers(
+    alerts = run_beers_evaluation(
         medications=med_names,
         age=payload.age,
         fall_risk=payload.fall_risk,
@@ -283,7 +331,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     
     med_rows = []
     for m in payload.medications:
-        canonical = lookup_hospital_drug(m.name)
+        canonical = match_drug_name(m.name)
         k = (canonical or m.name).strip().lower()
         if k in alert_map:
             matched = alert_map[k]
@@ -291,7 +339,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "name": m.name,
                 "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
                 "is_beers": True,
-                "alert_tag": matched["axis"]
+                "alert_tag": matched.get("axis", "Critério de Beers")
             })
         else:
             med_rows.append({
@@ -301,7 +349,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "alert_tag": ""
             })
 
-    # Gravação permanente no banco
+    # Gravação permanente no banco PostgreSQL
     record = ScreeningRecord(
         pharmacist_username="admin",
         sector=payload.sector,
@@ -315,9 +363,9 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     for a in alerts:
         alert_rec = ScreeningAlertRecord(
             screening_id=record.id,
-            drug_name=a["drug"],
-            axis=a["axis"],
-            recommendation=a["recommendation"]
+            drug_name=a.get("drug", "Medicamento"),
+            axis=a.get("axis", "Beers"),
+            recommendation=a.get("recommendation", "")
         )
         db.add(alert_rec)
     db.commit()
@@ -345,9 +393,9 @@ async def extract_pdf(file: UploadFile = File(...)):
                 for w in words:
                     clean = w.strip(".,;:()[]{}").strip()
                     if len(clean) >= 3:
-                        canonical = lookup_hospital_drug(clean)
-                        if canonical:
-                            found_drugs.add(canonical)
+                        matched = match_drug_name(clean)
+                        if matched and matched != clean:
+                            found_drugs.add(matched)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
 
@@ -362,4 +410,4 @@ def read_root():
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>FarmBeers Online. Arquivo index.html não localizado.</h1>"
-        
+    
