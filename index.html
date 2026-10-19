@@ -68,6 +68,62 @@
     </div>
   </div>
 
+  <!-- MODAL: MANUAL OPERACIONAL FARMBEERS (RESPONSIVO E SEM CORTES) -->
+  <div id="manualModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-3 sm:p-4">
+    <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden">
+      
+      <div class="bg-[#0b2447] text-white px-5 py-3.5 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i data-lucide="book-open" class="w-5 h-5 text-cyan-400"></i>
+          <h3 class="text-sm font-bold tracking-wide uppercase">Manual Operacional FarmBeers</h3>
+        </div>
+        <button type="button" onclick="toggleManualModal(false)" class="text-slate-300 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs text-slate-700 leading-relaxed">
+        <div class="border-b border-slate-200 pb-3">
+          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">1. Objetivo e Âmbito Clínico</h4>
+          <p>
+            O <strong>FarmBeers</strong> é uma ferramenta de suporte à decisão clínica baseada nas diretrizes da <em>American Geriatrics Society</em> (AGS Beers Criteria 2023), aplicada aos princípios ativos hospitalares brasileiros para prevenção de eventos adversos e morbimortalidade geriátrica.
+          </p>
+        </div>
+
+        <div class="border-b border-slate-200 pb-3">
+          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">2. Critério Etário de Triagem</h4>
+          <p>
+            A avaliação de Beers aplica-se a pacientes com <strong>idade igual ou superior a 65 anos</strong>. Para idades inferiores, o motor clínico valida a prescrição sem emitir alertas da Tabela 2 por definição de diretriz.
+          </p>
+        </div>
+
+        <div class="border-b border-slate-200 pb-3">
+          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">3. Classes Críticas e Medicamentos a Evitar (Tabela 2)</h4>
+          <ul class="list-disc pl-4 space-y-1 mt-1 text-slate-600">
+            <li><strong>Anti-histamínicos de 1ª Geração (Dexclorfeniramina, Hidroxizina, Prometazina):</strong> Potente efeito anticolinérgico. Risco de sedação, boca seca, constipação severa, retenção urinária e delirium. Preferir anti-histamínicos de 2ª geração ou controle tópico nasal.</li>
+            <li><strong>Benzodiazepínicos e Hipnóticos Z (Diazepam, Clonazepam, Zolpidem):</strong> Risco elevado de quedas, fraturas e confusão mental aguda. Exigem plano de desprescrição gradual (*tapering*).</li>
+            <li><strong>AINEs Sistêmicos (Diclofenaco, Cetoprofeno, Ibuprofeno):</strong> Alto risco de sangramento gastrointestinal e injúria renal aguda.</li>
+            <li><strong>Antieméticos Antidopaminérgicos (Metoclopramida):</strong> Risco de discinesia tardia extrapiramidal irreversível.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">4. Ajuste por Função Renal (CrCl)</h4>
+          <p>
+            O cálculo do Clearance de Creatinina utiliza o método Cockcroft-Gault com correção de peso ajustado e piso de creatinina para sarcopenia. Fármacos com eliminação renal crítica (ex.: Espironolactona e Morfina) acionam contraindicação em CrCl &lt; 30 mL/min.
+          </p>
+        </div>
+      </div>
+
+      <div class="bg-slate-100 px-5 py-2.5 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="toggleManualModal(false)" class="bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold px-4 py-1.5 rounded shadow">
+          Fechar Manual
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- MODAL: CONFERÊNCIA OBRIGATÓRIA DE EXTRAÇÃO PDF -->
   <div id="pdfReviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4">
     <div class="bg-white w-full max-w-md rounded-xl shadow-2xl p-5 border border-slate-200 space-y-3">
@@ -237,16 +293,13 @@
           <span>Nova Triagem</span>
         </button>
 
-        <!-- BOTÃO DO MANUAL OPERACIONAL (ABRE EM NOVA GUIA COM TARGET BLANK) -->
-        <a id="btnManualOperacional" 
-           href="https://gemini.google.com" 
-           target="_blank" 
-           rel="noopener noreferrer"
+        <!-- BOTÃO DO MANUAL OPERACIONAL (ABRE MODAL RESPONSIVO INTERNO) -->
+        <button type="button" onclick="toggleManualModal(true)"
            class="bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold px-3.5 py-1.5 rounded flex items-center gap-1.5 shadow transition border border-cyan-400/30"
-           title="Abrir Manual Operacional em nova guia">
+           title="Visualizar Manual Operacional">
           <i data-lucide="book-marked" class="w-3.5 h-3.5 text-cyan-200"></i>
           <span>Manual Operacional</span>
-        </a>
+        </button>
       </div>
 
       <div class="flex flex-wrap items-center justify-center gap-4 text-xs w-full md:w-auto">
@@ -300,7 +353,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Idade (Anos)</label>
-            <input type="number" id="inpAge" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="71" oninput="calculateCrCl(); saveState();">
+            <input type="number" id="inpAge" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="71" oninput="calculateCrCl(); saveState(); refreshUnifiedTable();">
           </div>
           <div>
             <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Setor</label>
@@ -312,7 +365,7 @@
         </div>
 
         <div class="flex items-center gap-2 pt-1">
-          <input type="checkbox" id="chkFallRisk" class="rounded text-emerald-600 focus:ring-0" onchange="saveState()">
+          <input type="checkbox" id="chkFallRisk" class="rounded text-emerald-600 focus:ring-0" onchange="saveState(); refreshUnifiedTable();">
           <label for="chkFallRisk" class="text-[11px] font-bold text-blue-900 cursor-pointer">Risco Alto de Queda (Idoso / Avaliação)</label>
         </div>
 
@@ -479,6 +532,16 @@
         navigator.sendBeacon("/api/v1/auth/logout", JSON.stringify({ username: currentUser.username }));
       }
     });
+
+    function toggleManualModal(show) {
+      const modal = document.getElementById("manualModal");
+      if (show) {
+        modal.classList.remove("hidden");
+        lucide.createIcons();
+      } else {
+        modal.classList.add("hidden");
+      }
+    }
 
     function verifyAuth() {
       const stored = localStorage.getItem(USER_KEY);
@@ -781,6 +844,23 @@
         return;
       }
 
+      // Renderização instantânea na tabela garantida
+      let quickHtml = "";
+      medicationsList.forEach((m, idx) => {
+        const parts = [m.dose, m.route, m.frequency].filter(Boolean).join(" ");
+        quickHtml += `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2.5 px-3 font-bold text-slate-800">${m.name}</td>
+            <td class="py-2.5 px-3 text-slate-600">${parts || "VO (Oral)"}</td>
+            <td class="py-2.5 px-3" id="cellTag_${idx}"><span class="text-slate-400 text-[10px]">Avaliando...</span></td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="removeMedication(${idx})" class="text-rose-600 hover:text-rose-800 font-bold text-[11px]">Remover</button>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = quickHtml;
+
       const payload = {
         age: parseInt(document.getElementById("inpAge").value) || 70,
         sector: document.getElementById("selSector").value,
@@ -801,24 +881,15 @@
 
         document.getElementById("topBeersCount").innerText = data.total_beers_alerts;
 
-        tbody.innerHTML = "";
         data.medication_rows.forEach((row, idx) => {
-          const statusBadge = row.is_beers
-            ? `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">
-                 <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i> ${row.alert_tag}
-               </span>`
-            : `<span class="text-slate-400 text-[10px]">Sem alertas AGS</span>`;
-
-          tbody.innerHTML += `
-            <tr class="hover:bg-slate-50">
-              <td class="py-2.5 px-3 font-bold text-slate-800">${row.name}</td>
-              <td class="py-2.5 px-3 text-slate-600">${row.dose_route}</td>
-              <td class="py-2.5 px-3">${statusBadge}</td>
-              <td class="py-2.5 px-3 text-right">
-                <button onclick="removeMedication(${idx})" class="text-rose-600 hover:text-rose-800 font-bold text-[11px]">Remover</button>
-              </td>
-            </tr>
-          `;
+          const cell = document.getElementById(`cellTag_${idx}`);
+          if (cell) {
+            cell.innerHTML = row.is_beers
+              ? `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                   <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i> ${row.alert_tag}
+                 </span>`
+              : `<span class="text-slate-400 text-[10px]">Sem alertas AGS</span>`;
+          }
         });
         lucide.createIcons();
       } catch (e) {
@@ -883,7 +954,7 @@
       const res = await fetch("/api/v1/prescription/extract-pdf", { method: "POST", body: fd });
       if (res.ok) {
         const data = await res.json();
-        pendingPdfMedications = data.medications || [];
+        pendingPdfMedications = data.medications || data.drugs || [];
         if (pendingPdfMedications.length === 0) {
           alert("Nenhum medicamento ativo detectado no PDF.");
           return;
@@ -904,6 +975,7 @@
         `;
       });
       togglePdfReviewModal(true);
+      lucide.createIcons();
     }
 
     function togglePdfReviewModal(show) {
