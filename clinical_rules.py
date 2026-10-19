@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-FarmBeers - Motor de Regras Clínicas (AGS Beers Criteria 2023)
+FarmBeers - Motor Clínico Oficial (AGS Beers Criteria 2023)
 Mapeamento dos 72 Fármacos Hospitalares Brasileiros Padronizados
 """
 import re
@@ -16,349 +16,384 @@ def normalize_text(text: str) -> str:
     return " ".join(text.split())
 
 # ==============================================================================
-# BASE DE CONHECIMENTO DE FÁRMACOS E REGRAS DE BEERS 2023 (TABELAS 2, 3, 5 E 6)
+# BASE DE REGRAS CLÍNICAS AGS BEERS 2023 COM RECOMENDAÇÃO, RACIONAL E TAPERING
 # ==============================================================================
-
-# Regras Clínicas por Princípio Ativo Canônico
 BEERS_RULES = {
-    # --------------------------------------------------------------------------
-    # ANTI-HISTAMÍNICOS DE 1ª GERAÇÃO (AÇÃO ANTICOLINÉRGICA POTENTE - TABELA 2)
-    # --------------------------------------------------------------------------
+    # ANTI-HISTAMÍNICOS DE 1ª GERAÇÃO (TABELA 2)
     "dexclorfeniramina": {
         "drug": "Dexclorfeniramina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Anti-histamínico de 1ª geração com potente ação anticolinérgica. Alto risco de sedação excessiva, confusão mental, boca seca, constipação e retenção urinária. Risco acentuado de quedas e fraturas em idosos. Recomendação: Evitar o uso. Alternativas: Corticoides nasais tópicos ou anti-histamínicos de 2ª geração (ex.: cetirizina, loratadina, fexofenadina)."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso rotineiro em idosos. Suspender e substituir por anti-histamínico de 2ª geração ou corticoide nasal.",
+        "rationale": "Potente ação anticolinérgica central e periférica. Causa sedação pronunciada, boca seca, constipação intestinal severa, retenção urinária e elevação crítica do risco de declínio cognitivo agudo e quedas.",
+        "tapering": "Pode ser descontinuada diretamente na ausência de anafilaxia aguda. Substituir por Loratadina 10mg/dia ou Cetirizina 5-10mg/dia se houver rinite/alergia ativa."
     },
     "hidroxizina": {
         "drug": "Hidroxizina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Potente ação anticolinérgica e sedativa. Risco elevado de sedação, delírio, quedas e retenção urinária. Evitar o uso em idosos."
-    },
-    "difenidramina": {
-        "drug": "Difenidramina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Anticolinérgico potente. Evitar o uso como antialérgico ou hipnótico. Alto risco de declínio cognitivo agudo e acidentes."
-    },
-    "dimenidrinato": {
-        "drug": "Dimenidrinato",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Alta atividade anticolinérgica e depressora do SNC. Evitar o uso para náuseas/êmese crônica ou vertigem em idosos. Preferir alternativas com menor perfil anticolinérgico (ex.: ondansetrona)."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso em geriatria.",
+        "rationale": "Efeito anticolinérgico intenso e sedação residual prolongada com prejuízo cognitivo e psicomotor.",
+        "tapering": "Suspensão direta; avaliar uso de emolientes tópicos ou anti-histamínicos não sedativos para prurido."
     },
     "prometazina": {
         "drug": "Prometazina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Fenotiazina com propriedades anticolinérgicas e antidopaminérgicas intensas. Alto risco de sedação prolongada, hipotensão ortostática, sintomas extrapiramidais e delírio. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso rotineiro como antialérgico, antiemético ou sedativo.",
+        "rationale": "Fenotiazina com bloqueio colinérgico, dopaminérgico e alfa-adrenérgico potente. Risco de hipotensão severa, sedação profunda e sintomas extrapiramidais.",
+        "tapering": "Descontinuar e utilizar Ondansetrona ou anti-histamínicos modernos conforme a indicação clínica."
     },
-    "ciproeptadina": {
-        "drug": "Ciproeptadina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Ação anticolinérgica potente. Evitar estimulantes de apetite ou antialérgicos dessa classe em idosos."
+    "dimenidrinato": {
+        "drug": "Dimenidrinato",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso frequente para náuseas, vômitos ou vertigem em idosos.",
+        "rationale": "Alta atividade anticolinérgica associada a delirium e lentificação psicomotora em ambiente hospitalar.",
+        "tapering": "Substituir por antieméticos de menor impacto neurológico central (ex.: Ondansetrona)."
+    },
+    "difenidramina": {
+        "drug": "Difenidramina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso profilático ou como hipnótico.",
+        "rationale": "Elevada carga anticolinérgica com comprovado risco de confusão mental aguda e desorientação espacial.",
+        "tapering": "Interrupção imediata."
     },
 
-    # --------------------------------------------------------------------------
-    # ANTIPARKINSONIANOS ANTICOLINÉRGICOS / ESPASMOLÍTICOS URINÁRIOS
-    # --------------------------------------------------------------------------
+    # ANTIESPASMÓDICOS E ANTICOLINÉRGICOS DIVERSOS
+    "escopolamina": {
+        "drug": "Escopolamina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso rotineiro para cólicas ou desconforto abdominal em idosos.",
+        "rationale": "Alcaloide com potente bloqueio colinérgico muscarínico. Provoca confusão mental, agitação paradoxal, taquicardia e retenção urinária aguda.",
+        "tapering": "Substituir por medidas não farmacológicas ou analgésicos simples quando apropriado."
+    },
     "biperideno": {
         "drug": "Biperideno",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Anticolinérgico de ação central. Alto risco de delírio, alucinações e retenção urinária aguda. Evitar na prevenção ou tratamento de sintomas extrapiramidais."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar na prevenção e manejo de sintomas extrapiramidais em idosos.",
+        "rationale": "Anticolinérgico de ação central com alto potencial para desencadear delírio, alucinações e perda de memória.",
+        "tapering": "Reduzir 50% da dose a cada 3 a 5 dias antes da suspensão definitiva para evitar efeito colinérgico rebote."
     },
     "oxibutinina": {
         "drug": "Oxibutinina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Espasmolítico urinário com forte bloqueio anticolinérgico sistêmico e central. Risco de piora cognitiva e constipação grave. Preferir fisioterapia pélvica ou mirabegrona."
-    },
-    "escopolamina": {
-        "drug": "Escopolamina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Alcaloide da beladona com pronunciada ação anticolinérgica. Causa confusão mental, agitação paradoxal e retenção urinária. Evitar em idosos."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar para incontinência urinária em idosos.",
+        "rationale": "Potente bloqueador muscarínico. Agrava constipação e piora o declínio cognitivo pré-existente.",
+        "tapering": "Desprescrever gradualmente; considerar fisioterapia uroginecológica ou agonista beta-3 (Mirabegrona)."
     },
 
-    # --------------------------------------------------------------------------
-    # BENZODIAZEPÍNICOS E HIPNÓTICOS SEDATIVOS (TABELA 2 E TABELA 3)
-    # --------------------------------------------------------------------------
+    # BENZODIAZEPÍNICOS E SEDATIVOS (TABELA 2 E 3)
     "diazepam": {
         "drug": "Diazepam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Benzodiazepínico de longa ação com metabólitos ativos acumulativos. Risco acentuado de sedação excessiva, quedas, fraturas e acidentes automobilísticos. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
+        "recommendation": "Evitar o uso crônico ou agudo em enfermarias e UTIs geriátricas.",
+        "rationale": "Meia-vida muito longa e acúmulo de metabólitos ativos (desmetildiazepam). Risco extremo de sonolência diurna, ataxia, quedas com fraturas e delirium.",
+        "tapering": "Desmame lento: diminuir 25% da dose a cada 1 a 2 semanas sob supervisão médica/farmacêutica para prevenir crise de abstinência e convulsões."
     },
     "clonazepam": {
         "drug": "Clonazepam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Alta sensibilidade em idosos, meia-vida longa. Risco significativo de comprometimento cognitivo, sedação diurna e quedas. Evitar o uso crônico."
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
+        "recommendation": "Evitar o uso crônico para insônia ou ansiedade.",
+        "rationale": "Sensibilidade cerebral aumentada a agonistas GABAérgicos no idoso, causando lentificação psicomotora e quedas.",
+        "tapering": "Reduzir progressivamente (ex.: 0,25mg a cada 7 a 14 dias) até o desmame total."
     },
     "lorazepam": {
         "drug": "Lorazepam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Benzodiazepínico. Embora de meia-vida intermediária, mantém risco elevado de ataxia, delírio, dependência e quedas em idosos. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
+        "recommendation": "Evitar a manutenção crônica.",
+        "rationale": "Apesar do metabolismo por conjugação direta, preserva alto risco de dependência física, tolerância, sedação e traumas físicos.",
+        "tapering": "Desmame gradual ao longo de 2 a 4 semanas."
     },
     "alprazolam": {
         "drug": "Alprazolam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Benzodiazepínico. Alto potencial de dependência física, tolerância, sedação e efeito rebote de ansiedade. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Rápida absorção e alta afinidade, associado a sintomas severos de rebote e dependência rápida.",
+        "tapering": "Reduzir 0,25mg semanalmente sob vigilância de sintomas de ansiedade de rebote."
     },
     "midazolam": {
         "drug": "Midazolam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Benzodiazepínico de curta ação. Restringir a procedimentos anestésicos/endoscópicos. Evitar como indutor do sono de enfermaria."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar exceto procedimentos)",
+        "recommendation": "Evitar como sedativo/indutor de sono em enfermarias clínicas.",
+        "rationale": "Sedação profunda, amnésia anterógrada e piora imediata de quadros confusionais agudos em internamento.",
+        "tapering": "Restringir estritamente a sedação processual ou descontinuar."
     },
     "zolpidem": {
         "drug": "Zolpidem",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Agonista do receptor benzodiazepínico (Droga Z). Apresenta risco de sonambulismo, confusão mental, quedas e fraturas semelhante aos benzodiazepínicos. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso para insônia em idosos.",
+        "rationale": "Mecanismo semelhante aos benzodiazepínicos. Eleva taxa de quedas noturnas, fraturas e comportamentos complexos do sono.",
+        "tapering": "Reduzir para 5mg/noite por 1 semana e suspender, priorizando higiene do sono não farmacológica."
     },
     "zopiclona": {
         "drug": "Zopiclona",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Droga Z sedativa. Risco elevado de sedação residual matinal, tontura e quedas. Evitar o uso crônico."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Droga Z com sedação residual diurna, tontura e perda de reflexos posturais.",
+        "tapering": "Desmame em 7 a 10 dias."
     },
 
-    # --------------------------------------------------------------------------
-    # ANTIDEPRESSIVOS TRICÍCLICOS E NEUROLÉPTICOS TÍPICOS / ATÍPICOS
-    # --------------------------------------------------------------------------
+    # NEUROLÉPTICOS E ANTIDEPRESSIVOS TRICÍCLICOS
     "amitriptilina": {
         "drug": "Amitriptilina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Antidepressivo tricíclico com potente efeito anticolinérgico e sedativo. Risco de hipotensão ortostática, arritmias e retenção urinária. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar para depressão, dor crônica ou insônia.",
+        "rationale": "Altamente anticolinérgica, sedativa e indutora de hipotensão postural e arritmias cardíacas por bloqueio de condução.",
+        "tapering": "Reduzir 10mg a cada semana. Substituir por Duloxetina ou Gabapentinoide para dor neuropática."
     },
     "nortriptilina": {
         "drug": "Nortriptilina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Tricíclico com moderada atividade anticolinérgica. Risco de sedação e efeitos cardíacos. Evitar na primeira linha."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar na 1ª linha)",
+        "recommendation": "Evitar na primeira linha terapêutica.",
+        "rationale": "Menor bloqueio que a amitriptilina, mas mantém risco significativo de efeitos anticolinérgicos e cardiovasculares.",
+        "tapering": "Desmame paulatino."
     },
     "clomipramina": {
         "drug": "Clomipramina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Tricíclico com alto bloqueio colinérgico e risco arritmogênico. Evitar em idosos."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Forte ação anticolinérgica e arritmogênica.",
+        "tapering": "Desmame gradual ao longo de 2 a 4 semanas."
     },
     "haloperidol": {
         "drug": "Haloperidol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar com ressalvas)",
-        "recommendation": "Antipsicótico típico. Elevado risco de sintomas extrapiramidais, discinesia tardia e aumento da mortalidade em idosos com demência. Evitar como controle comportamental não psicótico."
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar com ressalvas)",
+        "recommendation": "Evitar o uso como controle comportamental não psicótico em idosos com demência.",
+        "rationale": "Risco aumentado de eventos cerebrovasculares, parkinsonismo secundário medicamentoso e mortalidade global em demência.",
+        "tapering": "Restringir apenas a delírio hiperativo grave com risco iminente de dano; descontinuar assim que estabilizado."
     },
     "clorpromazina": {
         "drug": "Clorpromazina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Antipsicótico de baixa potência com forte efeito anticolinérgico, sedativo e hipotensor alfa-1 bloqueador. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em geriatria.",
+        "rationale": "Sedação severa, bloqueio alfa-1 com síncope postural e propriedades anticolinérgicas intensas.",
+        "tapering": "Desmame progressivo sob avaliação psiquiátrica."
     },
     "levomepromazina": {
         "drug": "Levomepromazina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Alta sedação, hipotensão postural e bloqueio anticolinérgico intenso. Evitar em idosos."
-    },
-    "tioridazina": {
-        "drug": "Tioridazina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Prolongamento do intervalo QT e efeito anticolinérgico severo. Evitar terminantemente."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Hipotensão severa, sonolência profunda e risco exacerbado de quedas hospitalares.",
+        "tapering": "Descontinuação progressiva."
     },
     "quetiapina": {
         "drug": "Quetiapina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar sem indicação precisa)",
-        "recommendation": "Antipsicótico atípico. Evitar o uso como indutor simples de sono ou para agitação não psicótica em demência (aumento de risco cerebrovascular)."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar sem indicação precisa)",
+        "recommendation": "Evitar o uso rotineiro como hipnótico simples ou para agitação isolada.",
+        "rationale": "Risco de hipotensão postural e eventos vasculares em idosos demenciados.",
+        "tapering": "Reduzir a dose gradualmente até suspensão se utilizada unicamente para sono."
     },
     "olanzapina": {
         "drug": "Olanzapina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Ação anticolinérgica intrínseca, ganho ponderal e risco de eventos vasculares encefálicos em idosos com demência."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos, exceto psicose ou transtorno bipolar refratário.",
+        "rationale": "Ação anticolinérgica considerável, ganho ponderal, síndrome metabólica e eventos vasculares em demência.",
+        "tapering": "Redução quinzenal da dose."
     },
     "risperidona": {
         "drug": "Risperidona",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Risco de sintomas extrapiramidais dose-dependentes e mortalidade aumentada em demência. Evitar exceto em psicoses graves."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar com ressalvas)",
+        "recommendation": "Evitar para controle de agitação sem sintomas psicóticos graves.",
+        "rationale": "Sintomas extrapiramidais dose-dependentes e risco aumentado de AVC e mortalidade em demência.",
+        "tapering": "Usar a menor dose eficaz e limitar a duração ao menor tempo possível."
     },
 
-    # --------------------------------------------------------------------------
-    # AGENTES GASTROINTESTINAIS E MOTILIDADE
-    # --------------------------------------------------------------------------
+    # GASTROINTESTINAIS E MOTILIDADE
     "metoclopramida": {
         "drug": "Metoclopramida",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Antagonista dopaminérgico central. Alto risco de sintomas extrapiramidais e discinesia tardia irreversível em idosos. Evitar o uso profilático ou prolongado. Alternativa: ondansetrona ou domperidona com cautela."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso crônico ou profilático desnecessário.",
+        "rationale": "Antagonismo D2 central. Causa discinesia tardia frequentemente irreversível, acatisia e parkinsonismo medicamentoso.",
+        "tapering": "Substituir por Ondansetrona ou Domperidona por curto período com monitoramento eletrocardiográfico."
     },
     "omeprazol": {
         "drug": "Omeprazol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso > 8 semanas)",
-        "recommendation": "Inibidor da Bomba de Prótons (IBP). O uso contínuo desnecessário (> 8 semanas) está associado a infecção por Clostridioides difficile, fraturas ósseas, hipomagnesemia e deficiência de vitamina B12."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso > 8 semanas)",
+        "recommendation": "Evitar uso contínuo por mais de 8 semanas sem indicação clínica formal.",
+        "rationale": "O bloqueio ácido crônico favorece infecção por Clostridioides difficile, desmineralização óssea com fraturas, hipomagnesemia e má absorção de B12.",
+        "tapering": "Reduzir para dose em dias alternados por 2 semanas antes da suspensão, associando antiácidos se houver pirose de rebote."
     },
     "pantoprazol": {
         "drug": "Pantoprazol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso > 8 semanas)",
-        "recommendation": "IBP. Evitar uso além de 8 semanas sem indicação clínica formal (ex.: úlcera ativa ou uso crônico de antiagregante/anticoagulante com alto risco hemorrágico)."
-    },
-    "esomeprazol": {
-        "drug": "Esomeprazol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso > 8 semanas)",
-        "recommendation": "IBP. Monitorar necessidade real de manutenção prolongada pelo risco de infecções entéricas e desmineralização óssea."
-    },
-    "lansoprazol": {
-        "drug": "Lansoprazol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso > 8 semanas)",
-        "recommendation": "IBP. Reavaliar indicação após 8 semanas de tratamento em pacientes hospitalizados ou ambulatoriais idosos."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso > 8 semanas)",
+        "recommendation": "Reavaliar necessidade de manutenção prolongada além de 8 semanas.",
+        "rationale": "Mesmos riscos associados à classe dos IBPs na população geriátrica.",
+        "tapering": "Desmame gradual para evitar hipersecreção ácida rebote."
     },
     "oleo mineral": {
         "drug": "Óleo Mineral",
-        "axis": "Critério de Beers - Tabela 2 (Evitar VO)",
-        "recommendation": "Risco de pneumonia lipoídica por aspiração pulmonar em idosos acamados ou com disfagia. Evitar a via oral."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar VO)",
+        "recommendation": "Evitar a administração por via oral.",
+        "rationale": "Risco de aspiração traqueobrônquica inadvertida e desenvolvimento de pneumonia lipoídica grave em idosos acamados ou disfágicos.",
+        "tapering": "Substituir por laxantes osmóticos seguros (ex.: Lactulose ou Macrogol / PEG)."
     },
 
-    # --------------------------------------------------------------------------
-    # ANTI-INFLAMATÓRIOS NÃO ESTEROIDAIS (AINES) E ANALGÉSICOS
-    # --------------------------------------------------------------------------
-    "diclofenaco": {
-        "drug": "Diclofenaco",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso crônico)",
-        "recommendation": "AINE não seletivo. Alto risco de sangramento gastrointestinal, piora da função renal, retenção hídrica/descompensação de IC e elevação da pressão arterial."
-    },
-    "ibuprofeno": {
-        "drug": "Ibuprofeno",
-        "axis": "Critério de Beers - Tabela 2 (Evitar uso crônico)",
-        "recommendation": "AINE. Risco de nefrotoxicidade aguda, hemorragia digestiva alta e antagonismo do efeito cardioprotetor da aspirina. Evitar uso prolongado."
-    },
-    "cetoprofeno": {
-        "drug": "Cetoprofeno",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE com pronunciada inibição de prostaglandinas renais e gástricas. Evitar o uso rotineiro em idosos internados."
-    },
-    "meloxicam": {
-        "drug": "Meloxicam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE com preferência COX-2. Mantém risco de complicações cardiovasculares e desfechos renais adversos em idosos."
-    },
-    "piroxicam": {
-        "drug": "Piroxicam",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE de meia-vida extremamente longa. Toxicidade gastrointestinal e cutânea superior aos outros AINEs. Evitar terminantemente."
-    },
-    "indometacina": {
-        "drug": "Indometacina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE com maior incidência de toxicidade no SNC (cefaleia, tontura, confusão mental) e eventos gástricos graves. Evitar."
-    },
-    "cetorolaco": {
-        "drug": "Cetorolaco",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE potente de uso parenteral/oral. Risco altíssimo de hemorragia gastrointestinal e falência renal aguda em idosos. Evitar."
-    },
-    "nimesulida": {
-        "drug": "Nimesulida",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "AINE associado a casos severos de hepatotoxicidade fulminante e lesão renal aguda em pacientes geriátricos. Evitar."
-    },
-
-    # --------------------------------------------------------------------------
     # RELAXANTES MUSCULARES
-    # --------------------------------------------------------------------------
     "ciclobenzaprina": {
         "drug": "Ciclobenzaprina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Estruturalmente similar aos antidepressivos tricíclicos. Intensa atividade anticolinérgica e sedativa. Elevado risco de sedação, arritmias e quedas em idosos. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar o uso em idosos.",
+        "rationale": "Homologia estrutural com tricíclicos; alta ação anticolinérgica, sedação excessiva, tontura e risco elevado de quedas.",
+        "tapering": "Suspensão direta; aplicar medidas fisioterápicas e analgésicos simples."
     },
     "carisoprodol": {
         "drug": "Carisoprodol",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Metabolizado a meprobamato (sedativo com alto risco de dependência e depressão respiratória). Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Biotransformado em meprobamato, com elevado perfil de sedação, tolerância e dependência química.",
+        "tapering": "Descontinuação progressiva em poucos dias."
     },
     "orfenadrina": {
         "drug": "Orfenadrina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Componente analgésico-relaxante com potente ação anticolinérgica e estimulante central. Risco de alucinações, boca seca e retenção urinária. Evitar."
-    },
-    "baclofeno": {
-        "drug": "Baclofeno",
-        "axis": "Critério de Beers - Tabela 2 (Cautela / Ajuste Renal)",
-        "recommendation": "Risco de encefalopatia e sedação severa, especialmente se houver perda de função renal. Evitar suspensão abrupta."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Anticolinérgico potente presente em analgésicos combinados; desencadeia boca seca, retenção urinária e desorientação.",
+        "tapering": "Substituir por dipirona ou paracetamol isolados."
     },
 
-    # --------------------------------------------------------------------------
-    # SISTEMA CARDIOVASCULAR E ANTI-HIPERTENSIVOS
-    # --------------------------------------------------------------------------
+    # AINES
+    "diclofenaco": {
+        "drug": "Diclofenaco",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso crônico)",
+        "recommendation": "Evitar uso crônico ou rotineiro.",
+        "rationale": "Risco de hemorragia gastrointestinal alta, lesão renal aguda, retenção hidrossalina e descompensação de insuficiência cardíaca e hipertensão.",
+        "tapering": "Suspender e transicionar para analgesia escalonada segura (Dipirona, Paracetamol ou opioide fraco por curto período)."
+    },
+    "ibuprofeno": {
+        "drug": "Ibuprofeno",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso crônico)",
+        "recommendation": "Evitar o uso frequente em idosos.",
+        "rationale": "Nefrotoxicidade aguda e risco ulcerogênico elevado no trato digestivo.",
+        "tapering": "Suspensão direta."
+    },
+    "cetoprofeno": {
+        "drug": "Cetoprofeno",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar prescrição rotineira em pacientes internados idosos.",
+        "rationale": "Inibição de prostaglandinas gástricas e renais protetoras com rápida deterioração da função renal.",
+        "tapering": "Suspensão imediata."
+    },
+    "cetorolaco": {
+        "drug": "Cetorolaco",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "AINE de altíssima potência associado a taxas desproporcionais de sangramento gástrico e falência renal aguda.",
+        "tapering": "Suspensão imediata."
+    },
+    "nimesulida": {
+        "drug": "Nimesulida",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar terminantemente.",
+        "rationale": "Hepatotoxicidade grave e nefrotoxicidade em pacientes geriátricos.",
+        "tapering": "Interrupção imediata."
+    },
+    "meloxicam": {
+        "drug": "Meloxicam",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Mantém risco cardiovascular e renal em idosos hospitalizados.",
+        "tapering": "Interromper e reavaliar analgesia."
+    },
+    "piroxicam": {
+        "drug": "Piroxicam",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar absolutamente.",
+        "rationale": "Meia-vida biológica superior a 50 horas com máxima taxa de sangramentos e reações adversas cutâneas graves.",
+        "tapering": "Suspensão imediata."
+    },
+
+    # CARDIOVASCULARES
     "digoxina": {
         "drug": "Digoxina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar na 1ª linha / Dose > 0.125mg)",
-        "recommendation": "Glicosídeo cardíaco de estreita faixa terapêutica. Depuração renal diminuída no idoso leva a intoxicação digitálica (náuseas, arritmias, bloqueios e distúrbios visuais). Evitar doses superiores a 0,125 mg/dia."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar como 1ª linha / Dose > 0.125mg)",
+        "recommendation": "Evitar na primeira linha para fibrilação atrial ou insuficiência cardíaca; se imprescindível, nunca exceder 0,125 mg/dia.",
+        "rationale": "Faixa terapêutica estreita e eliminação renal reduzida no envelhecimento; altíssimo risco de intoxicação digitálica com arritmias fatais e distúrbios neurológicos/visuais.",
+        "tapering": "Monitorar digoxinemia e função renal; ajustar ou transicionar para betabloqueador seguro."
     },
     "amiodarona": {
         "drug": "Amiodarona",
-        "axis": "Critério de Beers - Tabela 2 (Evitar na 1ª linha para FA)",
-        "recommendation": "Antiarrítmico com pronunciada toxicidade multissistêmica crônica (tireóide, pulmonar, hepática e prolongamento do intervalo QT). Evitar como terapia inicial de fibrilação atrial se houver alternativa de controle de frequência."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar como 1ª linha para FA)",
+        "recommendation": "Evitar como terapia inicial de FA, exceto em IC grave com disfunção de VE se outros agentes forem contraindicados.",
+        "rationale": "Múltiplas toxicidades cumulativas a longo prazo (tireoidiana, pulmonar com fibrose, hepática e prolongamento do intervalo QT).",
+        "tapering": "Desprescrição sob monitoramento do ritmo cardíaco conjunto com a cardiologia."
     },
     "espironolactona": {
         "drug": "Espironolactona",
-        "axis": "Critério de Beers - Tabela 2 e 6 (Evitar se dose > 25mg ou CrCl < 30)",
-        "recommendation": "Risco de hipercalemia fatal e acidose metabólica em idosos, especialmente em associação com IECA/BRA ou com insuficiência renal."
+        "axis": "AGS Beers 2023 - Tabela 2 e 6 (Evitar se dose > 25mg ou CrCl < 30)",
+        "recommendation": "Evitar doses > 25 mg/dia na IC ou evitar o uso se o Clearance de Creatinina for < 30 mL/min.",
+        "rationale": "Risco crítico de hipercalemia potencialmente letal, especialmente associado a IECA/BRA.",
+        "tapering": "Monitorar rigorosamente potássio sérico e creatinina; suspender se CrCl < 30 mL/min."
     },
     "clonidina": {
         "drug": "Clonidina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar na rotina de HAS)",
-        "recommendation": "Agonista alfa-2 central. Alto risco de sedação, boca seca, bradicardia e hipotensão ortostática com quedas, além de hipertensão rebote severa na interrupção. Evitar como anti-hipertensivo rotineiro."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar para HAS de rotina)",
+        "recommendation": "Evitar como anti-hipertensivo rotineiro em idosos.",
+        "rationale": "Agonista alfa-2 central. Causa sedação acentuada, boca seca, bradicardia sinusal, hipotensão ortostática com quedas e crise hipertensiva severa de rebote.",
+        "tapering": "Nunca suspender abruptamente. Reduzir a dose gradualmente ao longo de vários dias introduzindo anti-hipertensivo de primeira linha."
     },
     "metildopa": {
         "drug": "Metildopa",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Ação central depressora, bradicardizante e risco de anemia hemolítica e hepatite medicamentosa. Evitar em geriatria."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em geriatria.",
+        "rationale": "Depressão do SNC, bradicardia e risco imunológico de anemia hemolítica e lesão hepática.",
+        "tapering": "Desmame gradual associado à transição para bloqueador de canal de cálcio ou IECA/BRA."
     },
     "nifedipino": {
-        "drug": "Nifedipino (Liberação Imediata)",
-        "axis": "Critério de Beers - Tabela 2 (Evitar cápsula rápida)",
-        "recommendation": "Risco de hipotensão precipitada com isquemia coronariana ou cerebral aguda secundária a taquicardia reflexa. Não utilizar via sublingual ou cápsula líquida rápida."
+        "drug": "Nifedipino (Liberação Rápida)",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar liberação imediata)",
+        "recommendation": "Evitar cápsulas de liberação imediata ou via sublingual.",
+        "rationale": "Queda abrupta da pressão arterial desencadeando taquicardia reflexa com isquemia miocárdica ou cerebral aguda.",
+        "tapering": "Substituir por bloqueador de canal de cálcio de liberação prolongada ou anlodipino."
     },
     "doxazosina": {
         "drug": "Doxazosina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar para HAS)",
-        "recommendation": "Bloqueador alfa-1 periférico. Causa hipotensão postural acentuada e síncope ao levantar. Evitar como terapia primária de hipertensão."
-    },
-    "prazosina": {
-        "drug": "Prazosina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Hipotensão ortostática severa e risco de trauma mecânico por queda. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar como anti-hipertensivo)",
+        "recommendation": "Evitar como monoterapia ou agente primário para hipertensão.",
+        "rationale": "Bloqueador alfa-1 periférico com alta incidência de hipotensão ortostática severa e síncope.",
+        "tapering": "Se utilizada para HPB, manter monitoramento pressórico sentado/em pé rigoroso."
     },
 
-    # --------------------------------------------------------------------------
-    # HIPOGLICEMIANTES / SULFONILUREIAS
-    # --------------------------------------------------------------------------
+    # HIPOGLICEMIANTES
     "glibenclamida": {
         "drug": "Glibenclamida",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Sulfonilureia de meia-vida prolongada e metabólitos ativos acumulativos. Risco extremo de hipoglicemia grave e prolongada com dano neurológico permanente. Evitar. Alternativa: gliclazida, linagliptina ou metformina (ajustada à TFG)."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar terminantemente em pacientes geriátricos.",
+        "rationale": "Sulfonilureia de ação prolongada e metabólitos ativos que se acumulam no idoso; alto risco de hipoglicemia severa, prolongada e dano neurológico irreversível.",
+        "tapering": "Substituir imediatamente por Gliclazida MR, inibidor de DPP-4 (ex.: Linagliptina) ou esquema de insulina basal ajustada."
     },
     "glimepirida": {
         "drug": "Glimepirida",
-        "axis": "Critério de Beers - Tabela 2 (Evitar)",
-        "recommendation": "Risco elevado de hipoglicemia prolongada em pacientes idosos. Evitar."
-    },
-    "insulina": {
-        "drug": "Insulina Escalonada (Sliding Scale)",
-        "axis": "Critério de Beers - Tabela 2 (Evitar prescrição isolada de escala rápida)",
-        "recommendation": "Evitar o uso exclusivo de esquema móvel/escalonado de insulina de ação rápida ou ultra-rápida (Sliding Scale) sem insulina basal em enfermarias, devido ao risco de hipoglicemia severa sem controle glicêmico adequado."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Risco aumentado de hipoglicemias prolongadas em relação a outras opções antidiabéticas.",
+        "tapering": "Transicionar para opções com menor risco de hipoglicemia."
     },
 
-    # --------------------------------------------------------------------------
-    # ANALGÉSICOS OPIOIDES E DIVERSOS
-    # --------------------------------------------------------------------------
+    # OPIOIDES E DIVERSOS
     "tramadol": {
         "drug": "Tramadol",
-        "axis": "Critério de Beers - Tabela 2 e 5 (Evitar / Risco de Síndrome Serotoninérgica e SIADH)",
-        "recommendation": "Risco de hiponatremia por SIADH, confusão mental, náuseas e redução do limiar convulsivo. Em combinação com antidepressivos serotoninérgicos, pode desencadear Síndrome Serotoninérgica fatal."
+        "axis": "AGS Beers 2023 - Tabela 2 e 5 (Evitar / Risco de SIADH e Síndrome Serotoninérgica)",
+        "recommendation": "Evitar o uso rotineiro ou associado a psicotrópicos.",
+        "rationale": "Pode precipitar hiponatremia grave por SIADH, reduzir limiar epiléptico e causar Síndrome Serotoninérgica quando combinado com antidepressivos.",
+        "tapering": "Reduzir 25-50% da dose a cada 3 dias antes da descontinuação."
     },
     "codeina": {
         "drug": "Codeína",
-        "axis": "Critério de Beers - Tabela 2 (Cautela / Constipação grave)",
-        "recommendation": "Metabolização dependente do CYP2D6. Risco elevado de constipação refratária, sedação e retenção urinária. Associar laxativos profiláticos."
+        "axis": "AGS Beers 2023 - Tabela 2 (Cautela / Constipação severa)",
+        "recommendation": "Evitar uso prolongado; se necessário, prescrever laxativo profilático obrigatório.",
+        "rationale": "Metabolismo variável via CYP2D6 e altíssima prevalência de constipação refratária e retenção urinária.",
+        "tapering": "Desmame rápido e substituição por analgésicos não opioides."
     },
     "morfina": {
         "drug": "Morfina",
-        "axis": "Critério de Beers - Tabela 6 (Ajuste Renal / Evitar no CrCl < 30)",
-        "recommendation": "Acúmulo de metabólitos ativos (morfina-6-glicuronídeo e morfina-3-glicuronídeo) na disfunção renal, provocando narcose profunda, mioclonias e depressão respiratória."
-    },
-    "fentanila": {
-        "drug": "Fentanila",
-        "axis": "Critério de Beers - Tabela 2 (Evitar adesivo em paciente virgem de opioide)",
-        "recommendation": "Risco de depressão respiratória fatal em pacientes geriátricos não tolerantes a opioides ou com caquexia (absorção errática)."
+        "axis": "AGS Beers 2023 - Tabela 6 (Ajuste por Função Renal)",
+        "recommendation": "Evitar se Clearance de Creatinina < 30 mL/min.",
+        "rationale": "Retenção de metabólitos ativos neurotóxicos (M3G e M6G) levando a mioclonias, delírio e depressão respiratória grave.",
+        "tapering": "Em caso de falência renal, substituir por Fentanila ou Metadona sob titulação rigorosa."
     },
     "meperidina": {
         "drug": "Meperidina",
-        "axis": "Critério de Beers - Tabela 2 (Evitar terminantemente)",
-        "recommendation": "Opioide com metabólito neurotóxico (normeperidina) que se acumula e provoca convulsões, mioclonias e alucinações. Evitar."
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar absolutamente)",
+        "recommendation": "Evitar em qualquer cenário na geriatria.",
+        "rationale": "O metabólito normeperidina possui meia-vida longa, excreção renal e neurotoxicidade extrema com convulsões e alucinações.",
+        "tapering": "Substituição imediata por outro analgésico."
     }
 }
 
@@ -375,63 +410,46 @@ SYNONYM_MAP = {
     "clorfeniramina": "dexclorfeniramina",
     "coristina": "dexclorfeniramina",
 
-    # Hidroxizina
+    # Anti-histamínicos
     "hidroxizina": "hidroxizina",
-    "cloridrato de hidroxizina": "hidroxizina",
     "hixizine": "hidroxizina",
     "prurizin": "hidroxizina",
-
-    # Difenidramina
-    "difenidramina": "difenidramina",
-    "benadryl": "difenidramina",
-    "difenidrin": "difenidramina",
-
-    # Dimenidrinato
+    "prometazina": "prometazina",
+    "fenergan": "prometazina",
     "dimenidrinato": "dimenidrinato",
     "dramin": "dimenidrinato",
     "dramin b6": "dimenidrinato",
+    "difenidramina": "difenidramina",
+    "benadryl": "difenidramina",
 
-    # Prometazina
-    "prometazina": "prometazina",
-    "fenergan": "prometazina",
-    "prometazol": "prometazina",
-
-    # Biperideno
+    # Anticolinérgicos
+    "escopolamina": "escopolamina",
+    "buscopan": "escopolamina",
+    "hioscina": "escopolamina",
+    "butilbrometo de escopolamina": "escopolamina",
     "biperideno": "biperideno",
     "akineton": "biperideno",
-    "cinetol": "biperideno",
-
-    # Oxibutinina
     "oxibutinina": "oxibutinina",
     "retemic": "oxibutinina",
 
-    # Escopolamina
-    "escopolamina": "escopolamina",
-    "hioscina": "escopolamina",
-    "buscopan": "escopolamina",
-    "butilbrometo de escopolamina": "escopolamina",
-
-    # Benzodiazepínicos
+    # Benzodiazepínicos e Sedativos
     "diazepam": "diazepam",
     "valium": "diazepam",
-    "dienpax": "diazepam",
     "clonazepam": "clonazepam",
     "rivotril": "clonazepam",
     "lorazepam": "lorazepam",
     "lorax": "lorazepam",
     "alprazolam": "alprazolam",
-    "fronta": "alprazolam",
     "frontin": "alprazolam",
     "midazolam": "midazolam",
     "dormonid": "midazolam",
     "zolpidem": "zolpidem",
     "stilnox": "zolpidem",
     "patz": "zolpidem",
-    "turnover": "zolpidem",
     "zopiclona": "zopiclona",
     "imovane": "zopiclona",
 
-    # Antidepressivos Tricíclicos e Antipsicóticos
+    # Neuropáticos / Antidepressivos / Antipsicóticos
     "amitriptilina": "amitriptilina",
     "tryptanol": "amitriptilina",
     "amytril": "amitriptilina",
@@ -445,8 +463,6 @@ SYNONYM_MAP = {
     "amplictil": "clorpromazina",
     "levomepromazina": "levomepromazina",
     "neozine": "levomepromazina",
-    "tioridazina": "tioridazina",
-    "melleril": "tioridazina",
     "quetiapina": "quetiapina",
     "seroquel": "quetiapina",
     "olanzapina": "olanzapina",
@@ -454,42 +470,15 @@ SYNONYM_MAP = {
     "risperidona": "risperidona",
     "risperdal": "risperidona",
 
-    # Gastrointestinais
+    # GI e Motilidade
     "metoclopramida": "metoclopramida",
     "plasil": "metoclopramida",
     "omeprazol": "omeprazol",
     "losec": "omeprazol",
     "pantoprazol": "pantoprazol",
     "pantocal": "pantoprazol",
-    "pantozol": "pantoprazol",
-    "esomeprazol": "esomeprazol",
-    "nexium": "esomeprazol",
-    "lansoprazol": "lansoprazol",
-    "prazol": "lansoprazol",
     "oleo mineral": "oleo mineral",
-    "mineral": "oleo mineral",
     "nujol": "oleo mineral",
-
-    # AINEs
-    "diclofenaco": "diclofenaco",
-    "voltaren": "diclofenaco",
-    "cataflam": "diclofenaco",
-    "ibuprofeno": "ibuprofeno",
-    "advil": "ibuprofeno",
-    "alivium": "ibuprofeno",
-    "cetoprofeno": "cetoprofeno",
-    "profenid": "cetoprofeno",
-    "meloxicam": "meloxicam",
-    "movatec": "meloxicam",
-    "piroxicam": "piroxicam",
-    "feldene": "piroxicam",
-    "indometacina": "indometacina",
-    "cetorolaco": "cetorolaco",
-    "toradol": "cetorolaco",
-    "deocil": "cetorolaco",
-    "nimesulida": "nimesulida",
-    "scutamil": "nimesulida",
-    "nisulid": "nimesulida",
 
     # Relaxantes Musculares
     "ciclobenzaprina": "ciclobenzaprina",
@@ -500,8 +489,21 @@ SYNONYM_MAP = {
     "torsilax": "carisoprodol",
     "orfenadrina": "orfenadrina",
     "dorflex": "orfenadrina",
-    "baclofeno": "baclofeno",
-    "lioresal": "baclofeno",
+
+    # AINEs
+    "diclofenaco": "diclofenaco",
+    "voltaren": "diclofenaco",
+    "cataflam": "diclofenaco",
+    "ibuprofeno": "ibuprofeno",
+    "advil": "ibuprofeno",
+    "cetoprofeno": "cetoprofeno",
+    "profenid": "cetoprofeno",
+    "cetorolaco": "cetorolaco",
+    "toradol": "cetorolaco",
+    "nimesulida": "nimesulida",
+    "nisulid": "nimesulida",
+    "meloxicam": "meloxicam",
+    "piroxicam": "piroxicam",
 
     # Cardiovasculares
     "digoxina": "digoxina",
@@ -519,60 +521,41 @@ SYNONYM_MAP = {
     "adalat": "nifedipino",
     "doxazosina": "doxazosina",
     "carduran": "doxazosina",
-    "prazosina": "prazosina",
-    "minipress": "prazosina",
 
     # Hipoglicemiantes
     "glibenclamida": "glibenclamida",
     "daonil": "glibenclamida",
     "glimepirida": "glimepirida",
     "amaryl": "glimepirida",
-    "insulina": "insulina",
-    "insulina regular": "insulina",
-    "insulina lispro": "insulina",
-    "insulina asparte": "insulina",
 
     # Opioides
     "tramadol": "tramadol",
     "tramal": "tramadol",
-    "dorless": "tramadol",
     "codeina": "codeina",
     "tylex": "codeina",
     "morfina": "morfina",
     "dimorf": "morfina",
-    "fentanila": "fentanila",
-    "durogesic": "fentanila",
     "meperidina": "meperidina",
     "petidina": "meperidina",
     "dolantina": "meperidina"
 }
 
-# ==============================================================================
-# IDENTIFICADOR INTELIGENTE DE FÁRMACOS (ROBUSTO CONTRA DOSES E TEXTO EXTRA)
-# ==============================================================================
 def identify_drug_canonical(input_text: str) -> Optional[str]:
-    """
-    Identifica o fármaco canônico mesmo se o usuário digitar
-    'Dexclorfeniramina 4mg vo 2x/dia', 'Polaramine comp', etc.
-    """
+    """Identifica o fármaco canônico com tolerância a doses, vias e texto embutido."""
     if not input_text:
         return None
 
     cleaned = normalize_text(input_text)
 
-    # 1. Busca exata ou por chave direta de sinônimo
     if cleaned in SYNONYM_MAP:
         return SYNONYM_MAP[cleaned]
 
-    # 2. Busca por palavras completas ou prefixos nos sinônimos (ex: dexclorfeniramina dentro de uma frase)
-    # Ordena chaves das maiores para as menores para garantir casamento específico
     sorted_synonyms = sorted(SYNONYM_MAP.keys(), key=lambda x: len(x), reverse=True)
     for syn in sorted_synonyms:
         pattern = r"\b" + re.escape(syn) + r"\b"
         if re.search(pattern, cleaned):
             return SYNONYM_MAP[syn]
 
-    # 3. Verificação de subcadeia de pelo menos 5 caracteres
     for syn, canonical in SYNONYM_MAP.items():
         if len(syn) >= 5 and syn in cleaned:
             return canonical
@@ -580,7 +563,6 @@ def identify_drug_canonical(input_text: str) -> Optional[str]:
     return None
 
 def lookup_hospital_drug(name: str) -> Optional[str]:
-    """Mantém retrocompatibilidade de API"""
     return identify_drug_canonical(name)
 
 # ==============================================================================
@@ -593,52 +575,50 @@ def evaluate_patient_beers(
     conditions: Optional[List[str]] = None,
     crcl: Optional[float] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Avalia a prescrição do paciente e retorna os alertas clínicos de Beers 2023.
-    """
+    """Gera a lista completa de pareceres clínicos no formato esperado pelo index.html."""
     alerts = []
     conditions = conditions or []
 
-    # Critérios de Beers são estritamente desenhados para indivíduos idosos (>= 65 anos)
     if age < 65:
         return alerts
 
-    processed_drugs = set()
+    processed = set()
 
-    for raw_med in medications:
-        canonical = identify_drug_canonical(raw_med)
+    for raw in medications:
+        canonical = identify_drug_canonical(raw)
         if not canonical:
             continue
 
-        if canonical in processed_drugs:
+        if canonical in processed:
             continue
-        processed_drugs.add(canonical)
+        processed.add(canonical)
 
-        # Regra Geral de Beers (Tabela 2)
         if canonical in BEERS_RULES:
-            rule_info = BEERS_RULES[canonical]
-            alert_payload = {
-                "drug": rule_info["drug"],
-                "axis": rule_info["axis"],
-                "recommendation": rule_info["recommendation"]
-            }
+            r = BEERS_RULES[canonical]
+            rec = r["recommendation"]
+            rat = r["rationale"]
+            tap = r.get("tapering", "")
 
-            # Acréscimo dinâmico se houver Risco de Quedas marcado
             if fall_risk and canonical in [
                 "dexclorfeniramina", "hidroxizina", "difenidramina", "prometazina",
                 "diazepam", "clonazepam", "lorazepam", "alprazolam", "midazolam",
                 "zolpidem", "zopiclona", "amitriptilina", "quetiapina", "risperidona",
                 "olanzapina", "haloperidol", "clonidina", "tramadol"
             ]:
-                alert_payload["recommendation"] += " [ALERTA DE RISCO DE QUEDAS]: O paciente possui risco de quedas documentado; este fármaco aumenta exponencialmente a incidência de perda de equilíbrio, fraturas graves de fêmur e TCE."
+                rec += " [ALERTA DE QUEDAS]: Paciente com alto risco de quedas documentado; este fármaco eleva significativamente a ocorrência de fraturas ortopédicas e traumatismo cranioencefálico."
 
-            # Acréscimo dinâmico por Função Renal (Tabela 6)
             if crcl is not None:
                 if canonical == "espironolactona" and crcl < 30:
-                    alert_payload["recommendation"] += f" [AJUSTE RENAL CrCl={crcl} mL/min]: Espironolactona deve ser evitada com TFG < 30 mL/min pelo risco de hipercalemia fatal."
+                    rec += f" [AJUSTE RENAL CrCl={crcl} mL/min]: Evitar uso pelo risco iminente de hipercalemia refratária."
                 elif canonical == "morfina" and crcl < 30:
-                    alert_payload["recommendation"] += f" [AJUSTE RENAL CrCl={crcl} mL/min]: Morfina acumula metabólitos neurotóxicos e depressores respiratórios na insuficiência renal grave."
+                    rec += f" [AJUSTE RENAL CrCl={crcl} mL/min]: Evitar uso em TFG < 30 mL/min devido ao acúmulo de metabólitos neurotóxicos."
 
-            alerts.append(alert_payload)
+            alerts.append({
+                "drug": r["drug"],
+                "axis": r["axis"],
+                "recommendation": rec,
+                "rationale": rat,
+                "tapering": tap
+            })
 
     return alerts
