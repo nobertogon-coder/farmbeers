@@ -1,56 +1,64 @@
 import os
 import io
-import re
-import hashlib
-import secrets
-import unicodedata
-from datetime import datetime, timedelta
+import datetime
 from typing import List, Optional
-
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, Boolean, func
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 import pdfplumber
+from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func
+from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
-# Importação da base farmacológica enriquecida
-from clinical_rules import TABLE_2_GENERAL, TABLE_6_RENAL, TABLE_3_DISEASE_DRUG, TABLE_5_INTERACTIONS
+from clinical_rules import evaluate_patient_beers, lookup_hospital_drug
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmabeers.db")
+# ==============================================================================
+# CONFIGURAÇÃO DO BANCO DE DADOS (POSTGRESQL OU SQLITE DE FALLBACK)
+# ==============================================================================
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
+
+# Corrige prefixo legado do Render (postgres:// -> postgresql://)
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+# SQLite exige check_same_thread=False; PostgreSQL não aceita este argumento
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# =========================================================================
-# MODELOS DE DADOS (BANCO DE DADOS)
-# =========================================================================
+# ==============================================================================
+# MODELOS DE PERSISTÊNCIA (ORM)
+# ==============================================================================
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    salt = Column(String(64), nullable=False)
-    password_hash = Column(String(64), nullable=False)
-    role = Column(String(20), default="pharmacist", nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    last_ping = Column(DateTime, default=datetime.utcnow, nullable=False)
+    password = Column(String(100), nullable=False)
+    role = Column(String(20), default="pharmacist")  # 'admin' ou 'pharmacist'
+    is_active = Column(Boolean, default=True)
+    last_ping = Column(DateTime, default=datetime.datetime.utcnow)
 
-class AuditLog(Base):
-    __tablename__ = "audit_logs"
+class ScreeningRecord(Base):
+    __tablename__ = "screenings"
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    operator_username = Column(String(50), nullable=False)
-    patient_age = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    pharmacist_username = Column(String(50), nullable=False)
     sector = Column(String(50), nullable=False)
-    crcl_calculated = Column(Float, nullable=True)
-    total_medications = Column(Integer, nullable=False)
-    total_beers_alerts = Column(Integer, nullable=False)
-    identified_drugs = Column(JSON, nullable=False)
+    patient_age = Column(Integer, nullable=False)
+    crcl_ml_min = Column(Float, nullable=True)
+    total_alerts = Column(Integer, default=0)
+    alerts = relationship("ScreeningAlertRecord", back_populates="screening", cascade="all, delete-orphan")
+
+class ScreeningAlertRecord(Base):
+    __tablename__ = "screening_alerts"
+    id = Column(Integer, primary_key=True, index=True)
+    screening_id = Column(Integer, ForeignKey("screenings.id"))
+    drug_name = Column(String(100), nullable=False)
+    axis = Column(String(50), nullable=False)
+    recommendation = Column(String(500), nullable=False)
+    screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
 
@@ -61,225 +69,32 @@ def get_db():
     finally:
         db.close()
 
-def _hash_password(password: str, salt: str) -> str:
-    return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
-
+# ==============================================================================
+# INICIALIZAÇÃO DE USUÁRIOS PADRÃO
+# ==============================================================================
 def init_default_users():
-    """Garante a existência dos usuários requisitados: admin, farmaceutico e Teste."""
     db = SessionLocal()
     try:
-        users_to_seed = [
+        defaults = [
             ("admin", "admin123", "admin"),
             ("farmaceutico", "farm123", "pharmacist"),
-            ("Teste", "12345", "pharmacist")
+            ("Teste", "teste123", "pharmacist")
         ]
-        for uname, pwd, rle in users_to_seed:
-            existing = db.query(User).filter(User.username == uname).first()
-            if not existing:
-                s = secrets.token_hex(16)
-                h = _hash_password(pwd, s)
-                db.add(User(username=uname, salt=s, password_hash=h, role=rle, is_active=True))
+        for u, p, r in defaults:
+            exists = db.query(User).filter(User.username == u).first()
+            if not exists:
+                user = User(username=u, password=p, role=r, is_active=True, last_ping=datetime.datetime.utcnow())
+                db.add(user)
         db.commit()
     finally:
         db.close()
 
 init_default_users()
 
-# =========================================================================
-# SCHEMAS DA API (PYDANTIC)
-# =========================================================================
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class UserCreateRequest(BaseModel):
-    username: str
-    password: str
-    role: str = "pharmacist"
-
-class MedicationInput(BaseModel):
-    name: str
-    dose: Optional[str] = ""
-    route: Optional[str] = "VO (Oral)"
-    frequency: Optional[str] = ""
-
-class ScreeningPayload(BaseModel):
-    age: int
-    sector: str = "UPI (Enfermaria)"
-    fall_risk: bool = False
-    conditions: List[str] = []
-    crcl_ml_min: Optional[float] = None
-    crcl_notes: Optional[str] = ""
-    medications: List[MedicationInput]
-
-class BeersAlert(BaseModel):
-    axis: str
-    drug: str
-    category: str
-    recommendation: str
-    rationale: str
-    tapering: Optional[str] = None
-    severity: str
-
-class ScreenedMedicationRow(BaseModel):
-    name: str
-    dose_route: str
-    is_beers: bool
-    alert_tag: Optional[str] = None
-    recommendation: Optional[str] = None
-    rationale: Optional[str] = None
-    tapering: Optional[str] = None
-
-class ScreeningResult(BaseModel):
-    patient_age: int
-    sector: str
-    crcl_ml_min: Optional[float]
-    crcl_notes: Optional[str]
-    total_medications: int
-    total_beers_alerts: int
-    medication_rows: List[ScreenedMedicationRow]
-    alerts: List[BeersAlert]
-
-# =========================================================================
-# MOTOR CLÍNICO DE AVALIAÇÃO DE BEERS 2023
-# =========================================================================
-def _norm(text: str) -> str:
-    if not text:
-        return ""
-    nfkd = unicodedata.normalize("NFKD", text)
-    clean = "".join([c for c in nfkd if not unicodedata.combining(c)])
-    return clean.lower().strip()
-
-def _match_drug(text_norm: str, drug_name: str, aliases: list) -> bool:
-    """Verifica correspondência por palavra inteira usando fronteiras regex (\b)."""
-    targets = [drug_name.lower()] + [a.lower() for a in aliases]
-    for target in targets:
-        pattern = r'\b' + re.escape(target) + r'\b'
-        if re.search(pattern, text_norm):
-            return True
-    return False
-
-def evaluate_beers(payload: ScreeningPayload) -> ScreeningResult:
-    alerts: List[BeersAlert] = []
-    rows: List[ScreenedMedicationRow] = []
-
-    norm_conditions = [_norm(c) for c in (payload.conditions or [])]
-    if payload.fall_risk:
-        norm_conditions.append("queda")
-        norm_conditions.append("risco de queda")
-
-    # 1. Avaliação individual dos medicamentos prescritos
-    for med in payload.medications:
-        nmed = _norm(med.name)
-        row_alerts = []
-
-        # Tabela 2: Inapropriados Gerais (Alerta Vermelho)
-        for item in TABLE_2_GENERAL:
-            if _match_drug(nmed, item["drug"], item.get("aliases", [])):
-                alert = BeersAlert(
-                    axis="Tabela 2 (MPI Geral)",
-                    drug=item["drug"],
-                    category=item["cat"],
-                    recommendation=item["rec"],
-                    rationale=item["rat"],
-                    tapering=item.get("tapering"),
-                    severity="Alta"
-                )
-                alerts.append(alert)
-                row_alerts.append(alert)
-
-        # Tabela 6: Ajuste Renal Obrigatório (Alerta Condicional)
-        for item in TABLE_6_RENAL:
-            if _match_drug(nmed, item["drug"], item.get("aliases", [])):
-                cutoff = item.get("cutoff_clcr", 60.0)
-                if payload.crcl_ml_min is not None and payload.crcl_ml_min < cutoff:
-                    alert = BeersAlert(
-                        axis="Tabela 6 (Ajuste Renal)",
-                        drug=f"{item['drug']} (ClCr: {payload.crcl_ml_min} mL/min)",
-                        category=item["cat"],
-                        recommendation=item["rec"],
-                        rationale=f"{item['rat']} Guia: {item['guideline']}",
-                        tapering=item.get("guideline"),
-                        severity="Alta"
-                    )
-                    alerts.append(alert)
-                    row_alerts.append(alert)
-
-        # Tabela 3: Cruzamento Fármaco-Doença individual
-        for rule in TABLE_3_DISEASE_DRUG:
-            matched_cond = any(any(c_term in cond for c_term in rule["conditions"]) for cond in norm_conditions)
-            if matched_cond:
-                matched_drug = any(re.search(r'\b' + re.escape(d) + r'\b', nmed) for d in rule["drugs"])
-                if matched_drug:
-                    alert = BeersAlert(
-                        axis="Tabela 3 (Fármaco-Doença)",
-                        drug=f"{med.name} - {rule['title']}",
-                        category="Condição Clínica Associada",
-                        recommendation=rule["rec"],
-                        rationale=rule["rat"],
-                        tapering="Revisar prescrição com base no histórico clínico informado.",
-                        severity="Alta"
-                    )
-                    alerts.append(alert)
-                    row_alerts.append(alert)
-
-        # Configuração da linha visual da tabela
-        dose_info = f"{med.dose or ''} {med.route or ''} {med.frequency or ''}".strip()
-        if row_alerts:
-            primary = row_alerts[0]
-            rows.append(ScreenedMedicationRow(
-                name=med.name,
-                dose_route=dose_info or "--",
-                is_beers=True,
-                alert_tag=primary.axis,
-                recommendation=primary.recommendation,
-                rationale=primary.rationale,
-                tapering=primary.tapering
-            ))
-        else:
-            rows.append(ScreenedMedicationRow(
-                name=med.name,
-                dose_route=dose_info or "--",
-                is_beers=False,
-                alert_tag=None,
-                recommendation=None,
-                rationale=None,
-                tapering=None
-            ))
-
-    # 2. Avaliação de Interações Medicamentosas Duplas Críticas (Tabela 5)
-    all_meds_text = [_norm(m.name) for m in payload.medications]
-    for inter in TABLE_5_INTERACTIONS:
-        group_a, group_b = inter["pair"]
-        has_a = any(any(re.search(r'\b' + re.escape(term) + r'\b', m) for term in group_a) for m in all_meds_text)
-        has_b = any(any(re.search(r'\b' + re.escape(term) + r'\b', m) for term in group_b) for m in all_meds_text)
-
-        if has_a and has_b:
-            alerts.append(BeersAlert(
-                axis="Tabela 5 (Interação Crítica)",
-                drug=inter["alert"],
-                category="Interação Medicamentosa",
-                recommendation=inter["rec"],
-                rationale=inter["rat"],
-                tapering="Substituir ao menos um dos fármacos por opção analgésica/ansiolítica de menor risco conjunto.",
-                severity="Alta"
-            ))
-
-    return ScreeningResult(
-        patient_age=payload.age,
-        sector=payload.sector,
-        crcl_ml_min=payload.crcl_ml_min,
-        crcl_notes=payload.crcl_notes,
-        total_medications=len(payload.medications),
-        total_beers_alerts=len(alerts),
-        medication_rows=rows,
-        alerts=alerts
-    )
-
-# =========================================================================
+# ==============================================================================
 # APLICAÇÃO FASTAPI
-# =========================================================================
-app = FastAPI(title="FarmBeers - Triagem Hospitalar AGS Beers 2023", version="2.2.0")
+# ==============================================================================
+app = FastAPI(title="FarmBeers API", version="2.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -289,63 +104,81 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def get_index():
-    if os.path.exists("index.html"):
-        return FileResponse("index.html")
-    return {"message": "FarmBeers API ativa. Carregue o arquivo index.html."}
+# ==============================================================================
+# SCHEMAS PYDANTIC
+# ==============================================================================
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-# --- AUTENTICAÇÃO E SESSÃO ---
+class PingRequest(BaseModel):
+    username: str
+
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+
+class MedicationInput(BaseModel):
+    name: str
+    dose: Optional[str] = ""
+    route: Optional[str] = "VO (Oral)"
+    frequency: Optional[str] = ""
+
+class ScreeningPayload(BaseModel):
+    age: int
+    sector: str
+    fall_risk: bool
+    conditions: List[str]
+    crcl_ml_min: Optional[float] = None
+    crcl_notes: Optional[str] = ""
+    medications: List[MedicationInput]
+
+# ==============================================================================
+# ROTAS DE AUTENTICAÇÃO E PRESENÇA EM TEMPO REAL
+# ==============================================================================
 @app.post("/api/v1/auth/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == req.username).first()
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == payload.username, User.password == payload.password).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado.")
+        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conta desativada pelo administrador.")
+        raise HTTPException(status_code=403, detail="Acesso bloqueado pela administração.")
     
-    if _hash_password(req.password, user.salt) != user.password_hash:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta.")
-    
-    user.last_ping = datetime.utcnow()
+    user.last_ping = datetime.datetime.utcnow()
     db.commit()
-    return {
-        "status": "success",
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "role": user.role
-        }
-    }
+    return {"status": "ok", "user": {"id": user.id, "username": user.username, "role": user.role}}
 
 @app.post("/api/v1/auth/ping")
-def ping_user(payload: dict, db: Session = Depends(get_db)):
-    uname = payload.get("username")
-    if uname:
-        u = db.query(User).filter(User.username == uname).first()
-        if u:
-            u.last_ping = datetime.utcnow()
-            db.commit()
-    return {"status": "ok"}
+def ping_user(payload: PingRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == payload.username).first()
+    if user:
+        user.last_ping = datetime.datetime.utcnow()
+        db.commit()
+    return {"status": "alive"}
 
 @app.post("/api/v1/auth/logout")
-def logout_user(payload: dict, db: Session = Depends(get_db)):
-    uname = payload.get("username")
-    if uname:
-        u = db.query(User).filter(User.username == uname).first()
-        if u:
-            u.last_ping = datetime.utcnow() - timedelta(minutes=5)
-            db.commit()
+def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == payload.username).first()
+    if user:
+        user.last_ping = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
+        db.commit()
     return {"status": "logged_out"}
 
-# --- GESTÃO DE USUÁRIOS (ADMIN) ---
+# ==============================================================================
+# GESTÃO DE USUÁRIOS (ADMIN)
+# ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
-    now = datetime.utcnow()
+    now = datetime.datetime.utcnow()
     res = []
     for u in users:
-        is_online = (now - u.last_ping) < timedelta(seconds=60)
+        is_online = False
+        if u.last_ping:
+            diff = (now - u.last_ping).total_seconds()
+            if diff <= 60:
+                is_online = True
         res.append({
             "id": u.id,
             "username": u.username,
@@ -356,27 +189,31 @@ def list_users(db: Session = Depends(get_db)):
     return res
 
 @app.post("/api/v1/admin/users")
-def create_user(req: UserCreateRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.username == req.username).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
-    s = secrets.token_hex(16)
-    h = _hash_password(req.password, s)
-    new_user = User(username=req.username, salt=s, password_hash=h, role=req.role, is_active=True)
-    db.add(new_user)
+def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
+    exists = db.query(User).filter(User.username == payload.username).first()
+    if exists:
+        raise HTTPException(status_code=400, detail="Nome de usuário já existe.")
+    new_u = User(
+        username=payload.username,
+        password=payload.password,
+        role=payload.role,
+        is_active=True,
+        last_ping=datetime.datetime.utcnow()
+    )
+    db.add(new_u)
     db.commit()
-    return {"message": f"Usuário {req.username} criado com sucesso."}
+    return {"status": "created"}
 
 @app.patch("/api/v1/admin/users/{user_id}/toggle-status")
-def toggle_status(user_id: int, db: Session = Depends(get_db)):
+def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido desativar o administrador padrão.")
+        raise HTTPException(status_code=400, detail="Não é permitido bloquear o administrador padrão.")
     u.is_active = not u.is_active
     db.commit()
-    return {"message": "Status atualizado.", "is_active": u.is_active}
+    return {"status": "updated", "is_active": u.is_active}
 
 @app.delete("/api/v1/admin/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
@@ -384,106 +221,145 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido excluir o administrador principal.")
+        raise HTTPException(status_code=400, detail="Não é permitido excluir o administrador padrão.")
     db.delete(u)
     db.commit()
-    return {"message": "Usuário excluído com sucesso."}
+    return {"status": "deleted"}
 
-# --- TRIAGEM CLÍNICA E EXTRAÇÃO DE PDF ---
-@app.post("/api/v1/screen", response_model=ScreeningResult)
-def screen_prescription(payload: ScreeningPayload, db: Session = Depends(get_db)):
-    result = evaluate_beers(payload)
-    
-    # Registro de auditoria para o painel CFT
-    identified = [a.drug for a in result.alerts]
-    log_entry = AuditLog(
-        operator_username="farmaceutico",
-        patient_age=payload.age,
-        sector=payload.sector,
-        crcl_calculated=payload.crcl_ml_min,
-        total_medications=len(payload.medications),
-        total_beers_alerts=result.total_beers_alerts,
-        identified_drugs=identified
-    )
-    db.add(log_entry)
-    db.commit()
-    return result
-
-@app.post("/api/v1/prescription/extract-pdf")
-async def extract_prescription_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Apenas arquivos PDF são aceitos.")
-    
-    content = await file.read()
-    extracted_text = ""
-    try:
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            for page in pdf.pages:
-                extracted_text += (page.extract_text() or "") + "\n"
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar PDF: {str(e)}")
-
-    lines = extracted_text.splitlines()
-    detected_medications = []
-
-    # Construção do vocabulário de varredura ativa
-    targets = []
-    for item in TABLE_2_GENERAL:
-        targets.append(item["drug"])
-        targets.extend(item.get("aliases", []))
-    for item in TABLE_6_RENAL:
-        targets.append(item["drug"])
-        targets.extend(item.get("aliases", []))
-
-    for line in lines:
-        nline = _norm(line)
-        # Filtro de segurança: ignora frases de negação
-        if any(neg in nline for neg in ["nega uso", "sem uso de", "alergia a", "nao faz uso", "suspenso"]):
-            continue
-        
-        for t in targets:
-            if re.search(r'\b' + re.escape(t.lower()) + r'\b', nline):
-                title_med = t.capitalize()
-                if title_med not in detected_medications:
-                    detected_medications.append(title_med)
-
-    return {"medications": detected_medications}
-
-# --- INDICADORES CLÍNICOS CFT (ADMIN) ---
+# ==============================================================================
+# INDICADORES CLÍNICOS CFT (ADMIN)
+# ==============================================================================
 @app.get("/api/v1/admin/metrics")
-def get_metrics(
-    year: int = Query(2026),
-    month: Optional[int] = Query(None),
-    day: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    query = db.query(AuditLog)
-    query = query.filter(func.extract("year", AuditLog.timestamp) == year)
+def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(ScreeningRecord).filter(func.extract('year', ScreeningRecord.created_at) == year)
     if month:
-        query = query.filter(func.extract("month", AuditLog.timestamp) == month)
+        q = q.filter(func.extract('month', ScreeningRecord.created_at) == month)
     if day:
-        query = query.filter(func.extract("day", AuditLog.timestamp) == day)
+        q = q.filter(func.extract('day', ScreeningRecord.created_at) == day)
+    
+    screenings = q.all()
+    total_patients = len(screenings)
+    count_upi = sum(1 for s in screenings if s.sector == "UPI (Enfermaria)")
+    count_uti = sum(1 for s in screenings if s.sector == "UTI")
+    total_beers_alerts = sum(s.total_alerts for s in screenings)
 
-    logs = query.all()
-    total_patients = len(logs)
-    count_upi = sum(1 for l in logs if "UPI" in l.sector)
-    count_uti = sum(1 for l in logs if "UTI" in l.sector)
-    total_alerts = sum(l.total_beers_alerts for l in logs)
-
-    # Top 5 medicamentos de Beers mais prevalentes
-    drug_counts = {}
-    for l in logs:
-        if isinstance(l.identified_drugs, list):
-            for d in l.identified_drugs:
-                drug_counts[d] = drug_counts.get(d, 0) + 1
-
-    sorted_drugs = sorted(drug_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-    top_5 = [{"drug": k, "count": v} for k, v in sorted_drugs]
+    s_ids = [s.id for s in screenings]
+    top_5 = []
+    if s_ids:
+        rows = (
+            db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
+            .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
+            .group_by(ScreeningAlertRecord.drug_name)
+            .order_by(desc("total"))
+            .limit(5)
+            .all()
+        )
+        top_5 = [{"drug": r[0], "count": r[1]} for r in rows]
 
     return {
         "total_patients": total_patients,
         "count_upi": count_upi,
         "count_uti": count_uti,
-        "total_beers_alerts": total_alerts,
+        "total_beers_alerts": total_beers_alerts,
         "top_5_beers": top_5
     }
+
+# ==============================================================================
+# MOTOR DE TRIAGEM FARMBEERS
+# ==============================================================================
+@app.post("/api/v1/screen")
+def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
+    med_names = [m.name for m in payload.medications]
+    
+    alerts = evaluate_patient_beers(
+        medications=med_names,
+        age=payload.age,
+        fall_risk=payload.fall_risk,
+        conditions=payload.conditions,
+        crcl=payload.crcl_ml_min
+    )
+
+    alert_map = {a["drug"].strip().lower(): a for a in alerts}
+    
+    med_rows = []
+    for m in payload.medications:
+        canonical = lookup_hospital_drug(m.name)
+        k = (canonical or m.name).strip().lower()
+        if k in alert_map:
+            matched = alert_map[k]
+            med_rows.append({
+                "name": m.name,
+                "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
+                "is_beers": True,
+                "alert_tag": matched["axis"]
+            })
+        else:
+            med_rows.append({
+                "name": m.name,
+                "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
+                "is_beers": False,
+                "alert_tag": ""
+            })
+
+    # Gravação permanente no banco
+    record = ScreeningRecord(
+        pharmacist_username="admin",
+        sector=payload.sector,
+        patient_age=payload.age,
+        crcl_ml_min=payload.crcl_ml_min,
+        total_alerts=len(alerts)
+    )
+    db.add(record)
+    db.flush()
+
+    for a in alerts:
+        alert_rec = ScreeningAlertRecord(
+            screening_id=record.id,
+            drug_name=a["drug"],
+            axis=a["axis"],
+            recommendation=a["recommendation"]
+        )
+        db.add(alert_rec)
+    db.commit()
+
+    return {
+        "total_beers_alerts": len(alerts),
+        "alerts": alerts,
+        "medication_rows": med_rows
+    }
+
+# ==============================================================================
+# EXTRAÇÃO DE PRESCRIÇÃO PDF
+# ==============================================================================
+@app.post("/api/v1/prescription/extract-pdf")
+async def extract_pdf(file: UploadFile = File(...)):
+    contents = await file.read()
+    found_drugs = set()
+    try:
+        with pdfplumber.open(io.BytesIO(contents)) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if not text:
+                    continue
+                words = text.split()
+                for w in words:
+                    clean = w.strip(".,;:()[]{}").strip()
+                    if len(clean) >= 3:
+                        canonical = lookup_hospital_drug(clean)
+                        if canonical:
+                            found_drugs.add(canonical)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
+
+    return {"medications": sorted(list(found_drugs))}
+
+# ==============================================================================
+# FRONTEND ESTÁTICO NATIVO
+# ==============================================================================
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>FarmBeers Online. Arquivo index.html não localizado.</h1>"
+        
