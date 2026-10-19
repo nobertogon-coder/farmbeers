@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FarmBeers - Triagem Farmacoterapêutica AGS Beers 2023</title>
+  <title>FarmBeers - Instrumento de Triagem Farmacoterapêutica AGS Beers 2023</title>
   <style>
     :root {
-      --primary: #0f3c5c;
-      --primary-hover: #0a293f;
-      --accent: #00875a;
+      --primary: #0b2545;
+      --primary-light: #134074;
+      --accent: #007f5f;
       --accent-hover: #006644;
-      --warning: #ffab00;
-      --danger: #de350b;
-      --light-bg: #f4f5f7;
+      --warning: #d97706;
+      --danger: #b91c1c;
+      --bg-gray: #f8fafc;
       --card-bg: #ffffff;
-      --border-color: #dfe1e6;
-      --text-main: #172b4d;
-      --text-muted: #5e6c84;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
     }
 
     * {
@@ -28,10 +28,10 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--light-bg);
-      color: var(--text-main);
+      background-color: var(--bg-gray);
+      color: var(--text);
       line-height: 1.5;
-      padding-bottom: 60px;
+      padding-bottom: 80px;
       overflow-x: hidden;
       width: 100vw;
     }
@@ -39,35 +39,36 @@
     header {
       background-color: var(--primary);
       color: #ffffff;
-      padding: 16px 20px;
+      padding: 14px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: 1000;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
     }
 
     .brand-title {
       font-size: 1.25rem;
-      font-weight: 700;
+      font-weight: 800;
       letter-spacing: -0.5px;
     }
 
     .brand-sub {
       font-size: 0.75rem;
       opacity: 0.85;
+      font-weight: 400;
     }
 
-    .header-actions {
+    .header-btns {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .btn-header {
-      background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+    .btn-top {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
       color: #ffffff;
       padding: 6px 12px;
       border-radius: 6px;
@@ -77,51 +78,57 @@
     }
 
     .container {
-      max-width: 900px;
-      margin: 20px auto;
-      padding: 0 16px;
+      max-width: 960px;
+      margin: 16px auto;
+      padding: 0 14px;
     }
 
     .card {
       background: var(--card-bg);
-      border-radius: 10px;
-      border: 1px solid var(--border-color);
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
 
     .card-title {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       color: var(--primary);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 2px solid var(--light-bg);
+      border-bottom: 1px solid #e2e8f0;
       padding-bottom: 8px;
     }
 
-    .badge-count {
-      background: #ebecf0;
+    .badge-counter {
+      background: #e2e8f0;
       color: var(--text-muted);
       font-size: 0.8rem;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 16px;
+      font-weight: 700;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
     }
 
     .form-group {
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
     label {
       display: block;
       font-size: 0.85rem;
       font-weight: 600;
-      margin-bottom: 6px;
-      color: var(--text-main);
+      color: var(--text);
+      margin-bottom: 5px;
     }
 
     input[type="text"],
@@ -129,43 +136,35 @@
     select,
     textarea {
       width: 100%;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border-color);
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
       border-radius: 6px;
       font-size: 0.95rem;
-      color: var(--text-main);
+      color: var(--text);
       background-color: #ffffff;
-      transition: border-color 0.2s;
     }
 
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: var(--primary);
+      border-color: var(--primary-light);
     }
 
-    .row-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-    }
-
-    .checkbox-tile {
+    .checkbox-box {
       display: flex;
       align-items: center;
       gap: 8px;
-      background: #fafbfc;
-      border: 1px solid var(--border-color);
-      padding: 10px 12px;
+      background: #f1f5f9;
+      padding: 10px 14px;
       border-radius: 6px;
-      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      font-size: 0.88rem;
       cursor: pointer;
     }
 
-    .btn {
+    .btn-main {
       width: 100%;
       padding: 12px;
-      border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 0.95rem;
       font-weight: 700;
       cursor: pointer;
@@ -173,64 +172,75 @@
       justify-content: center;
       align-items: center;
       gap: 8px;
-      transition: background 0.2s;
+      border: none;
     }
 
-    .btn-primary {
-      background-color: var(--primary);
+    .btn-navy {
+      background-color: #0b2545;
       color: #ffffff;
     }
 
-    .btn-accent {
+    .btn-green {
       background-color: var(--accent);
       color: #ffffff;
       font-size: 1.05rem;
-      padding: 15px;
+      padding: 14px;
     }
 
-    .btn-secondary {
-      background-color: #ebecf0;
-      color: var(--text-main);
+    .btn-add {
+      background-color: #0b2545;
+      color: #ffffff;
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      margin-top: 8px;
     }
 
-    .btn-danger-sm {
-      background: #ffebe6;
+    .btn-del {
+      background: #fee2e2;
       color: var(--danger);
       border: none;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 4px;
       font-size: 0.75rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
     }
 
-    /* Tabela Responsiva de Medicamentos */
-    .table-responsive {
+    /* Tabela de Medicamentos */
+    .table-container {
       width: 100%;
       overflow-x: auto;
-      margin-top: 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 6px;
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 0.85rem;
+      font-size: 0.88rem;
     }
 
     th {
-      background-color: #f4f5f7;
-      padding: 10px 12px;
+      background-color: #f1f5f9;
+      padding: 10px 14px;
       font-weight: 700;
       color: var(--text-muted);
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border);
+      text-transform: uppercase;
+      font-size: 0.75rem;
     }
 
     td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-color);
+      padding: 11px 14px;
+      border-bottom: 1px solid #e2e8f0;
       vertical-align: middle;
     }
 
@@ -238,19 +248,19 @@
       border-bottom: none;
     }
 
-    .empty-state {
+    .empty-row {
       text-align: center;
-      padding: 24px;
+      padding: 26px;
       color: var(--text-muted);
       font-style: italic;
     }
 
-    /* Parecer e Alertas Clínicos */
+    /* Parecer Clínico */
     .alert-card {
-      border-left: 5px solid var(--danger);
-      background: #fff0ed;
-      padding: 14px;
-      border-radius: 4px;
+      border-left: 4px solid var(--danger);
+      background: #fff1f2;
+      padding: 14px 16px;
+      border-radius: 6px;
       margin-bottom: 12px;
     }
 
@@ -259,57 +269,47 @@
       font-weight: 700;
       color: var(--danger);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
 
     .alert-drug {
-      font-size: 1rem;
-      font-weight: 700;
-      color: #bf2600;
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #991b1b;
       margin-bottom: 4px;
     }
 
     .alert-desc {
-      font-size: 0.85rem;
-      color: #172b4d;
+      font-size: 0.88rem;
+      color: #334155;
+      line-height: 1.4;
     }
 
-    .badge-alert {
-      background: #fffae6;
-      border: 1px solid #ffe380;
-      color: #ff8b00;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 0.9rem;
-    }
-
-    /* Modal Responsivo (Manual Operacional) */
-    .modal-overlay {
+    /* Modal do Manual (Responsivo e Sem Cortes Laterais) */
+    .modal-backdrop {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(9, 30, 66, 0.54);
+      background: rgba(15, 23, 42, 0.65);
       display: none;
       justify-content: center;
       align-items: center;
-      z-index: 1000;
-      padding: 12px;
+      z-index: 2000;
+      padding: 14px;
     }
 
-    .modal-content {
+    .modal-box {
       background: #ffffff;
       width: 100%;
-      max-width: 650px;
+      max-width: 680px;
       max-height: 85vh;
-      border-radius: 10px;
+      border-radius: 12px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
     }
 
     .modal-header {
@@ -325,38 +325,37 @@
       padding: 20px;
       overflow-y: auto;
       font-size: 0.9rem;
+      color: var(--text);
       line-height: 1.6;
-      color: var(--text-main);
     }
 
     .modal-body h4 {
       color: var(--primary);
-      margin: 16px 0 6px 0;
+      margin: 14px 0 6px 0;
     }
 
-    .modal-close-btn {
+    .btn-close-modal {
       background: none;
       border: none;
       color: #ffffff;
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       cursor: pointer;
       line-height: 1;
     }
 
-    /* Loading Spinner */
-    .spinner {
-      border: 3px solid rgba(255,255,255,0.3);
+    .spin {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top: 2px solid #ffffff;
       border-radius: 50%;
-      border-top: 3px solid #ffffff;
-      width: 18px;
-      height: 18px;
-      animation: spin 0.8s linear infinite;
+      animation: rotate 0.8s linear infinite;
       display: inline-block;
     }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -365,19 +364,19 @@
   <header>
     <div>
       <div class="brand-title">FarmBeers</div>
-      <div class="brand-sub">Triagem Clínica AGS Beers 2023</div>
+      <div class="brand-sub">Triagem Farmacoterapêutica AGS Beers 2023</div>
     </div>
-    <div class="header-actions">
-      <button class="btn-header" onclick="openManual()">Manual</button>
+    <div class="header-btns">
+      <button class="btn-top" onclick="openManualModal()">Manual Operacional</button>
     </div>
   </header>
 
   <div class="container">
-    
+
     <!-- 1. DADOS DO PACIENTE -->
     <div class="card">
       <div class="card-title">1. Dados do Paciente</div>
-      <div class="row-grid">
+      <div class="grid-3">
         <div class="form-group">
           <label>Idade (anos)</label>
           <input type="number" id="patientAge" value="70" min="0" max="120">
@@ -391,46 +390,59 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Clearance de Creatinina (mL/min)</label>
+          <label>Clearance Creatinina (mL/min)</label>
           <input type="number" id="crclValue" placeholder="Ex: 28">
         </div>
       </div>
-      <div class="form-group" style="margin-top: 6px;">
-        <label class="checkbox-tile">
+      <div class="form-group" style="margin-top: 4px;">
+        <label class="checkbox-box">
           <input type="checkbox" id="fallRiskCheck" checked>
-          <span><strong>Risco Elevado de Quedas</strong> (Histórico de quedas ou marcha instável)</span>
+          <span><strong>Risco Elevado de Quedas</strong> (Histórico de quedas, fraqueza ou marcha instável)</span>
         </label>
       </div>
     </div>
 
-    <!-- 2. EXTRAÇÃO DE PRESCRIÇÃO -->
+    <!-- 2. DIAGNÓSTICOS E CONDIÇÕES CLÍNICAS -->
     <div class="card">
-      <div class="card-title">2. Prescrição Hospitalar (PDF ou Texto)</div>
+      <div class="card-title">2. Diagnósticos e Condições Clínicas</div>
+      <div class="grid-3">
+        <label class="checkbox-box"><input type="checkbox" value="Insuficiência Cardíaca" class="cond-check"> Insuficiência Cardíaca</label>
+        <label class="checkbox-box"><input type="checkbox" value="Doença Renal Crônica" class="cond-check"> Doença Renal Crônica</label>
+        <label class="checkbox-box"><input type="checkbox" value="Demência ou Declínio Cognitivo" class="cond-check"> Demência / Cognição</label>
+        <label class="checkbox-box"><input type="checkbox" value="Histórico de Úlcera Péptica" class="cond-check"> Úlcera Péptica / Sangramento</label>
+        <label class="checkbox-box"><input type="checkbox" value="Doença de Parkinson" class="cond-check"> Doença de Parkinson</label>
+        <label class="checkbox-box"><input type="checkbox" value="Constipação Crônica" class="cond-check"> Constipação Crônica</label>
+      </div>
+    </div>
+
+    <!-- 3. PRESCRIÇÃO HOSPITALAR -->
+    <div class="card">
+      <div class="card-title">3. Prescrição Hospitalar (PDF ou Texto)</div>
       <div class="form-group">
         <label>Anexar Prescrição em PDF</label>
         <input type="file" id="pdfFileInput" accept="application/pdf">
       </div>
       <div class="form-group">
-        <label>Ou Cole o Texto da Prescrição</label>
-        <textarea id="prescriptionText" rows="3" placeholder="Cole aqui o texto da prescrição..."></textarea>
+        <label>Ou Cole a Prescrição</label>
+        <textarea id="prescriptionText" rows="3" placeholder="Cole o texto da prescrição..."></textarea>
       </div>
-      <button class="btn btn-primary" id="btnExtract" onclick="extractPrescription()">
+      <button class="btn-main btn-navy" id="btnExtractPdf" onclick="handlePrescriptionExtract()">
         <span>Extrair Prescrição Completa</span>
       </button>
     </div>
 
-    <!-- 3. MEDICAMENTOS EM USO -->
+    <!-- 4. MEDICAMENTOS EM USO -->
     <div class="card">
       <div class="card-title">
-        <span>3. Medicamentos em Uso</span>
-        <span class="badge-count" id="medCounter">0 Medicamento(s)</span>
+        <span>4. Medicamentos em Uso</span>
+        <span class="badge-counter" id="medCounterBadge">0 Medicamento(s)</span>
       </div>
 
       <!-- Inserção Manual Rápida -->
-      <div style="background: #fafbfc; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-bottom: 12px;">
-        <label style="margin-bottom: 8px;">+ Adição Rápida Manual</label>
-        <div class="row-grid" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
-          <input type="text" id="manualMedName" placeholder="Medicamento ou Princípio Ativo (Ex: Dexclorfeniramina)...">
+      <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+        <label style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">+ Adição Rápida Manual</label>
+        <div class="grid-3" style="grid-template-columns: 2fr 1fr 1fr 1fr;">
+          <input type="text" id="manualMedName" placeholder="Princípio Ativo ou Medicamento (Ex: Dexclorfeniramina)...">
           <input type="text" id="manualMedDose" placeholder="Dose (Ex: 2mg)">
           <select id="manualMedRoute">
             <option value="VO (Oral)">VO (Oral)</option>
@@ -438,180 +450,180 @@
             <option value="SC (Subcutânea)">SC (Subcutânea)</option>
             <option value="IM (Intramuscular)">IM (Intramuscular)</option>
           </select>
-          <input type="text" id="manualMedFreq" placeholder="Posologia (Ex: 12/12h)">
+          <input type="text" id="manualMedFreq" placeholder="Posologia (Ex: 1x/dia)">
         </div>
-        <button class="btn btn-secondary" style="margin-top: 10px; font-weight: 700;" onclick="addManualMedication()">
-          + Inserir Medicamento
-        </button>
+        <button class="btn-add" onclick="handleAddManualMed()">+ Inserir</button>
       </div>
 
       <!-- Tabela Renderizada -->
-      <div class="table-responsive">
+      <div class="table-container">
         <table>
           <thead>
             <tr>
               <th>Medicamento / Princípio Ativo</th>
               <th>Dose / Via / Posologia</th>
-              <th style="width: 70px; text-align: center;">Ação</th>
+              <th style="width: 80px; text-align: center;">Ação</th>
             </tr>
           </thead>
-          <tbody id="medTableBody">
+          <tbody id="medicationTableBody">
             <tr>
-              <td colspan="3" class="empty-state">Nenhum medicamento na lista. Adicione manualmente ou anexe um PDF.</td>
+              <td colspan="3" class="empty-row">Nenhum medicamento na lista. Adicione manualmente ou anexe o PDF.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <button class="btn btn-accent" style="margin-top: 16px;" onclick="processScreening()" id="btnScreen">
+      <button class="btn-main btn-green" style="margin-top: 18px;" id="btnScreenProcess" onclick="handleScreeningProcess()">
         <span>Processar Triagem Farm-Beers (AGS Beers 2023)</span>
       </button>
     </div>
 
-    <!-- 4. PARECER FARMACOTERAPÊUTICO -->
-    <div class="card" id="resultCard" style="display: none;">
+    <!-- PARECER FARMACOTERAPÊUTICO -->
+    <div class="card" id="screeningResultsCard" style="display: none;">
       <div class="card-title">
         <div>
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent); font-weight: 700;">Parecer Farmacoterapêutico de Beers</div>
-          <div>Plano de Intervenção Clínica e Desprescrição</div>
+          <div style="font-size: 0.78rem; text-transform: uppercase; color: var(--accent); font-weight: 800;">Parecer Farmacoterapêutico de Beers</div>
+          <div style="font-size: 1.1rem; font-weight: 800;">Plano de Intervenção Clínica e Desprescrição</div>
         </div>
-        <div class="badge-alert" id="resultAlertBadge">0 Alertas</div>
+        <span id="alertsCountBadge" style="background: #fef3c7; color: #b45309; padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 0.88rem;">0 Alertas</span>
       </div>
 
-      <div id="alertsContainer"></div>
+      <div id="alertsOutputContainer"></div>
     </div>
 
   </div>
 
-  <!-- MODAL MANUAL OPERACIONAL (RESPONSIVO E SEM CORTES) -->
-  <div class="modal-overlay" id="manualModal">
-    <div class="modal-content">
+  <!-- MODAL MANUAL OPERACIONAL RESPONSIVO (SEM CORTES) -->
+  <div class="modal-backdrop" id="manualModal">
+    <div class="modal-box">
       <div class="modal-header">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">Manual Operacional - FarmBeers</h3>
-        <button class="modal-close-btn" onclick="closeManual()">&times;</button>
+        <h3 style="font-size: 1.1rem; font-weight: 800;">Manual Operacional - FarmBeers</h3>
+        <button class="btn-close-modal" onclick="closeManualModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <h4>1. Objetivo do Sistema</h4>
-        <p>Identificar Medicamentos Potencialmente Inapropriados para Idosos (MPI) segundo os <strong>Critérios de Beers da American Geriatrics Society (AGS 2023)</strong> nos 72 princípios ativos hospitalares brasileiros padronizados.</p>
+        <h4>1. Objetivo e Âmbito Clínico</h4>
+        <p>O <strong>FarmBeers</strong> é uma ferramenta de triagem clínica baseada nos critérios da <em>American Geriatrics Society</em> (AGS Beers 2023), aplicada aos 72 fármacos hospitalares brasileiros selecionados.</p>
 
-        <h4>2. Critério Etário de Segurança</h4>
-        <p>Os critérios de Beers são aplicáveis a pacientes com <strong>idade igual ou superior a 65 anos</strong>. Para pacientes abaixo de 65 anos, a triagem não gera alertas por definição clínica.</p>
+        <h4>2. Critério Etário de Aplicação</h4>
+        <p>Os critérios de Beers são definidos estritamente para pacientes com <strong>idade igual ou superior a 65 anos</strong>. Pacientes com idade inferior não geram alertas pela diretriz.</p>
 
-        <h4>3. Fármacos Críticos e Ação Anticolinérgica</h4>
-        <p>Anti-histamínicos de 1ª geração (ex.: <em>Dexclorfeniramina</em>, <em>Prometazina</em>, <em>Dimenidrinato</em>) e relaxantes/antiespasmodicos possuem alto risco de sedação, boca seca, constipação severa, delírio e retenção urinária. Devem ser desprescritos ou substituídos por fármacos de segunda geração.</p>
+        <h4>3. Anti-Histamínicos de 1ª Geração (Tabela 2)</h4>
+        <p>Fármacos como <strong>Dexclorfeniramina</strong>, <strong>Hidroxizina</strong> e <strong>Prometazina</strong> apresentam potente bloqueio anticolinérgico, resultando em sedação excessiva, quedas, fraturas, retenção urinária e declínio cognitivo agudo.</p>
 
-        <h4>4. Ajuste por Função Renal (CrCl)</h4>
-        <p>Fármacos como a <em>Espironolactona</em> e a <em>Morfina</em> exigem suspensão ou monitoramento redobrado quando o Clearance de Creatinina for inferior a 30 mL/min.</p>
+        <h4>4. Ajuste por Clearance Renal</h4>
+        <p>Substâncias de excreção predominantemente renal (como <em>Morfina</em> e <em>Espironolactona</em>) possuem diretrizes específicas de redução ou suspensão em taxas inferiores a 30 mL/min.</p>
       </div>
     </div>
   </div>
 
   <script>
-    // Lista Global de Medicamentos em Memória
-    let medicationList = [];
+    // Memória Global de Medicamentos da Triagem
+    let activeMedications = [];
 
     // -------------------------------------------------------------
-    // RENDERIZADOR DA TABELA (Resolve a falha de não aparecer na tela)
+    // RENDERIZAÇÃO DA TABELA (Resolve a sincronização e exibição)
     // -------------------------------------------------------------
-    function renderMedTable() {
-      const tbody = document.getElementById("medTableBody");
-      const counter = document.getElementById("medCounter");
+    function updateMedicationTable() {
+      const tbody = document.getElementById("medicationTableBody");
+      const badge = document.getElementById("medCounterBadge");
 
-      counter.innerText = `${medicationList.length} Medicamento(s)`;
+      badge.innerText = `${activeMedications.length} Medicamento(s)`;
 
-      if (medicationList.length === 0) {
+      if (activeMedications.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="3" class="empty-state">Nenhum medicamento na lista. Adicione manualmente ou anexe um PDF.</td>
+            <td colspan="3" class="empty-row">Nenhum medicamento na lista. Adicione manualmente ou anexe o PDF.</td>
           </tr>
         `;
         return;
       }
 
-      let html = "";
-      medicationList.forEach((item, index) => {
-        const doseInfo = [item.dose, item.route, item.frequency].filter(Boolean).join(" ");
-        html += `
+      let rowsHtml = "";
+      activeMedications.forEach((med, idx) => {
+        const details = [med.dose, med.route, med.frequency].filter(Boolean).join(" ");
+        rowsHtml += `
           <tr>
-            <td><strong>${item.name}</strong></td>
-            <td>${doseInfo || "VO (Oral)"}</td>
+            <td><strong>${med.name}</strong></td>
+            <td>${details || "VO (Oral)"}</td>
             <td style="text-align: center;">
-              <button class="btn-danger-sm" onclick="removeMedication(${index})">Remover</button>
+              <button class="btn-del" onclick="deleteMedication(${idx})">Excluir</button>
             </td>
           </tr>
         `;
       });
-      tbody.innerHTML = html;
+
+      tbody.innerHTML = rowsHtml;
     }
 
-    // Adição Manual
-    function addManualMedication() {
+    function handleAddManualMed() {
       const nameInput = document.getElementById("manualMedName");
       const doseInput = document.getElementById("manualMedDose");
       const routeInput = document.getElementById("manualMedRoute");
       const freqInput = document.getElementById("manualMedFreq");
 
-      const name = nameInput.value.trim();
-      if (!name) {
-        alert("Digite o nome ou princípio ativo do medicamento.");
+      const nameVal = nameInput.value.trim();
+      if (!nameVal) {
+        alert("Informe o nome ou princípio ativo do medicamento.");
         nameInput.focus();
         return;
       }
 
-      medicationList.push({
-        name: name,
+      activeMedications.push({
+        name: nameVal,
         dose: doseInput.value.trim(),
         route: routeInput.value,
         frequency: freqInput.value.trim()
       });
 
-      // Limpar campos
       nameInput.value = "";
       doseInput.value = "";
       freqInput.value = "";
       nameInput.focus();
 
-      renderMedTable();
+      updateMedicationTable();
     }
 
-    function removeMedication(index) {
-      medicationList.splice(index, 1);
-      renderMedTable();
+    function deleteMedication(idx) {
+      activeMedications.splice(idx, 1);
+      updateMedicationTable();
     }
 
     // -------------------------------------------------------------
-    // EXTRAÇÃO DE PRESCRIÇÃO (PDF OU TEXTO)
+    // EXTRAÇÃO DA PRESCRIÇÃO (PDF OU TEXTO DIGITADO)
     // -------------------------------------------------------------
-    async function extractPrescription() {
+    async function handlePrescriptionExtract() {
       const fileInput = document.getElementById("pdfFileInput");
       const textInput = document.getElementById("prescriptionText");
-      const btn = document.getElementById("btnExtract");
+      const btn = document.getElementById("btnExtractPdf");
 
       if (fileInput.files.length === 0 && !textInput.value.trim()) {
-        alert("Por favor, selecione um arquivo PDF ou cole o texto da prescrição.");
+        alert("Selecione um arquivo PDF ou digite/cole a prescrição.");
         return;
       }
 
       btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> <span>Processando...</span>`;
+      btn.innerHTML = `<span class="spin"></span> <span>Extraindo Prescrição...</span>`;
 
       try {
         if (fileInput.files.length > 0) {
           const formData = new FormData();
           formData.append("file", fileInput.files[0]);
 
-          const response = await fetch("/api/v1/prescription/extract-pdf", {
+          const res = await fetch("/api/v1/prescription/extract-pdf", {
             method: "POST",
             body: formData
           });
 
-          if (!response.ok) throw new Error("Erro na extração do PDF.");
-          const data = await response.json();
+          if (!res.ok) throw new Error("Falha no servidor ao ler PDF.");
+          const data = await res.json();
 
-          if (data.medications && data.medications.length > 0) {
-            data.medications.forEach(medName => {
-              if (!medicationList.some(m => m.name.toLowerCase() === medName.toLowerCase())) {
-                medicationList.push({
+          // Aceita formato de array ou de objetos retornados
+          const extractedList = data.medications || data.drugs || [];
+          if (extractedList.length > 0) {
+            extractedList.forEach(m => {
+              const medName = typeof m === "string" ? m : m.name;
+              if (!activeMedications.some(item => item.name.toLowerCase() === medName.toLowerCase())) {
+                activeMedications.push({
                   name: medName,
                   dose: "",
                   route: "VO (Oral)",
@@ -620,15 +632,14 @@
               }
             });
           } else {
-            alert("Nenhum princípio ativo hospitalar mapeado foi localizado no documento.");
+            alert("Nenhum princípio ativo hospitalar identificado no PDF.");
           }
         } else {
-          // Extração a partir do texto digitado
-          const lines = textInput.value.split("\n");
-          lines.forEach(line => {
-            const clean = line.trim();
+          const rawLines = textInput.value.split("\n");
+          rawLines.forEach(l => {
+            const clean = l.trim();
             if (clean.length > 2) {
-              medicationList.push({
+              activeMedications.push({
                 name: clean,
                 dose: "",
                 route: "VO (Oral)",
@@ -638,9 +649,9 @@
           });
         }
 
-        renderMedTable();
+        updateMedicationTable();
       } catch (err) {
-        alert("Falha ao processar prescrição: " + err.message);
+        alert("Erro na leitura da prescrição: " + err.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<span>Extrair Prescrição Completa</span>`;
@@ -650,86 +661,90 @@
     // -------------------------------------------------------------
     // PROCESSAMENTO DA TRIAGEM DE BEERS
     // -------------------------------------------------------------
-    async function processScreening() {
-      if (medicationList.length === 0) {
-        alert("Adicione pelo menos um medicamento à lista antes de processar.");
+    async function handleScreeningProcess() {
+      if (activeMedications.length === 0) {
+        alert("Adicione pelo menos um medicamento à tabela antes de processar.");
         return;
       }
 
       const age = parseInt(document.getElementById("patientAge").value) || 0;
       const sector = document.getElementById("patientSector").value;
-      const crclVal = parseFloat(document.getElementById("crclValue").value) || null;
+      const crcl = parseFloat(document.getElementById("crclValue").value) || null;
       const fallRisk = document.getElementById("fallRiskCheck").checked;
-      const btn = document.getElementById("btnScreen");
+      const btn = document.getElementById("btnScreenProcess");
+
+      const conditions = [];
+      document.querySelectorAll(".cond-check:checked").forEach(cb => {
+        conditions.push(cb.value);
+      });
 
       btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> <span>Validando Critérios AGS Beers 2023...</span>`;
+      btn.innerHTML = `<span class="spin"></span> <span>Analisando Critérios de Beers 2023...</span>`;
 
       const payload = {
         age: age,
         sector: sector,
         fall_risk: fallRisk,
-        conditions: [],
-        crcl_ml_min: crclVal,
-        medications: medicationList
+        conditions: conditions,
+        crcl_ml_min: crcl,
+        medications: activeMedications
       };
 
       try {
-        const res = await fetch("/api/v1/screen", {
+        const response = await fetch("/api/v1/screen", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
 
-        if (!res.ok) throw new Error("Erro no processamento da triagem.");
-        const result = await res.json();
+        if (!response.ok) throw new Error("Erro no cálculo da triagem.");
+        const results = await response.json();
 
-        displayResults(result);
-      } catch (err) {
-        alert("Erro na triagem: " + err.message);
+        renderScreeningResults(results);
+      } catch (e) {
+        alert("Erro ao processar triagem: " + e.message);
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<span>Processar Triagem Farm-Beers (AGS Beers 2023)</span>`;
       }
     }
 
-    function displayResults(data) {
-      const card = document.getElementById("resultCard");
-      const badge = document.getElementById("resultAlertBadge");
-      const container = document.getElementById("alertsContainer");
+    function renderScreeningResults(data) {
+      const card = document.getElementById("screeningResultsCard");
+      const badge = document.getElementById("alertsCountBadge");
+      const container = document.getElementById("alertsOutputContainer");
 
       card.style.display = "block";
-      badge.innerText = `${data.total_beers_alerts} Alerta(s) Identificado(s)`;
+      badge.innerText = `${data.total_beers_alerts} Alertas Identificados`;
 
       if (data.total_beers_alerts === 0) {
         container.innerHTML = `
-          <div style="background: #e3fcef; border: 1px solid #abf5d1; color: #006644; padding: 16px; border-radius: 6px; font-weight: 500;">
+          <div style="background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 16px; border-radius: 8px; font-weight: 600;">
             ✓ Prescrição validada. Nenhum critério de Beers violado para o perfil clínico informado.
           </div>
         `;
       } else {
-        let html = "";
-        data.alerts.forEach(alertItem => {
-          html += `
+        let alertsHtml = "";
+        data.alerts.forEach(al => {
+          alertsHtml += `
             <div class="alert-card">
-              <div class="alert-tag">${alertItem.axis}</div>
-              <div class="alert-drug">${alertItem.drug}</div>
-              <div class="alert-desc">${alertItem.recommendation}</div>
+              <div class="alert-tag">${al.axis}</div>
+              <div class="alert-drug">${al.drug}</div>
+              <div class="alert-desc">${al.recommendation}</div>
             </div>
           `;
         });
-        container.innerHTML = html;
+        container.innerHTML = alertsHtml;
       }
 
-      // Rola a tela até o resultado
       card.scrollIntoView({ behavior: "smooth" });
     }
 
     // Modal
-    function openManual() {
+    function openManualModal() {
       document.getElementById("manualModal").style.display = "flex";
     }
-    function closeManual() {
+    function closeManualModal() {
       document.getElementById("manualModal").style.display = "none";
     }
   </script>
