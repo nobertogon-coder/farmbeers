@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Compatibilidade 100% com o index.html original
+Parser Avançado com Regex de Doses/Vias/Posologia (SN/QN/SOS) e Criptografia SHA-256
 """
 import os
 import io
+import re
+import hashlib
 import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
@@ -30,11 +32,15 @@ engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+def hash_password(password: str) -> str:
+    salt = "FB_CLINICAL_SALT_2026"
+    return hashlib.sha256((password + salt).encode("utf-8")).hexdigest()
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    password = Column(String(100), nullable=False)
+    password_hash = Column(String(100), nullable=False)
     role = Column(String(20), default="pharmacist")
     is_active = Column(Boolean, default=True)
     last_ping = Column(DateTime, default=datetime.datetime.utcnow)
@@ -79,7 +85,13 @@ def init_default_users():
         for u, p, r in defaults:
             exists = db.query(User).filter(User.username == u).first()
             if not exists:
-                user = User(username=u, password=p, role=r, is_active=True, last_ping=datetime.datetime.utcnow())
+                user = User(
+                    username=u,
+                    password_hash=hash_password(p),
+                    role=r,
+                    is_active=True,
+                    last_ping=datetime.datetime.utcnow()
+                )
                 db.add(user)
         db.commit()
     finally:
@@ -88,9 +100,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI APP
+# FASTAPI CONFIGURAÇÃO
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.4.0")
+app = FastAPI(title="FarmBeers System API", version="3.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -117,6 +129,7 @@ class MedicationInput(BaseModel):
     dose: Optional[str] = ""
     route: Optional[str] = "VO (Oral)"
     frequency: Optional[str] = ""
+    is_sos: Optional[bool] = False
 
 class ScreeningPayload(BaseModel):
     age: Optional[int] = 70
@@ -128,15 +141,26 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput] = []
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO
+# AUTENTICAÇÃO COM HASH SHA-256
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == payload.username, User.password == payload.password).first()
+    pwd_h = hash_password(payload.password)
+    user = db.query(User).filter(User.username == payload.username, User.password_hash == pwd_h).first()
+    
+    # Retrocompatibilidade automática se o banco ainda tiver senhas em texto puro
+    if not user:
+        legacy_user = db.query(User).filter(User.username == payload.username, User.password_hash == payload.password).first()
+        if legacy_user:
+            legacy_user.password_hash = pwd_h
+            db.commit()
+            user = legacy_user
+
     if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Acesso bloqueado pela administração.")
+    
     user.last_ping = datetime.datetime.utcnow()
     db.commit()
     return {"status": "ok", "user": {"id": user.id, "username": user.username, "role": user.role}}
@@ -158,7 +182,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# ROTAS DE ADMINISTRAÇÃO E INDICADORES CFT
+# GESTÃO DE USUÁRIOS & INDICADORES CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -183,7 +207,7 @@ def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
     new_u = User(
         username=payload.username,
-        password=payload.password,
+        password_hash=hash_password(payload.password),
         role=payload.role,
         is_active=True,
         last_ping=datetime.datetime.utcnow()
@@ -250,15 +274,15 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# MOTOR DE TRIAGEM FARMBEERS
+# MOTOR DE TRIAGEM COM ESTRATIFICAÇÃO SN/QN/SOS E VIGILÂNCIA RENAL
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     patient_age = payload.age if (payload.age and payload.age > 0) else 70
-    med_names = [m.name for m in payload.medications]
+    med_dicts = [m.model_dump() for m in payload.medications]
     
     alerts_raw = clinical_rules.evaluate_patient_beers(
-        medications=med_names,
+        medications=med_dicts,
         age=patient_age,
         fall_risk=bool(payload.fall_risk),
         conditions=payload.conditions or [],
@@ -272,7 +296,8 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
             "axis": a.get("axis", "AGS Beers 2023"),
             "recommendation": a.get("recommendation", "Reavaliar prescrição."),
             "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
-            "tapering": a.get("tapering", "")
+            "tapering": a.get("tapering", ""),
+            "is_sos": a.get("is_sos", False)
         })
 
     alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
@@ -293,12 +318,18 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
+        
+        # Indica visualmente se é SN / QN
+        is_sn_flag = bool(m.is_sos) or any(t in dose_route_str.lower() for t in ["sn", "qn", "sos"])
+        if is_sn_flag and "[SN/QN]" not in dose_route_str:
+            dose_route_str = f"{dose_route_str} [SN/QN]"
 
         if matched:
             med_rows.append({
                 "name": m.name,
                 "dose_route": dose_route_str,
                 "is_beers": True,
+                "is_sos": is_sn_flag,
                 "alert_tag": matched.get("axis", "AGS Beers 2023")
             })
         else:
@@ -306,6 +337,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "name": m.name,
                 "dose_route": dose_route_str,
                 "is_beers": False,
+                "is_sos": is_sn_flag,
                 "alert_tag": ""
             })
 
@@ -340,12 +372,49 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PRESCRIÇÃO HOSPITALAR (PDF)
+# EXTRAÇÃO DE PDF HOSPITALAR INTELIGENTE (REGEX DE DOSE, VIA E SN/QN)
 # ==============================================================================
+def extract_posology_details(line: str):
+    dose = ""
+    route = "VO (Oral)"
+    freq = ""
+    is_sn = False
+
+    # Regex de Dosagem (ex: 4mg, 500mg, 1g, 20 gotas, 1 amp, 2 cp)
+    m_dose = re.search(r'(\b\d+[\.,]?\d*\s*(?:mg|g|mcg|ml|gotas|gota|ampola|amp|cp|comp|frasco)\b)', line, re.I)
+    if m_dose:
+        dose = m_dose.group(1).strip()
+
+    # Regex de Via de Administração Hospitalar
+    if re.search(r'\b(iv|ev|endovenos[ao]|intravenos[ao])\b', line, re.I):
+        route = "IV (Endovenoso)"
+    elif re.search(r'\b(im|intramuscular)\b', line, re.I):
+        route = "IM (Intramuscular)"
+    elif re.search(r'\b(sc|subcutane[ao])\b', line, re.I):
+        route = "SC (Subcutâneo)"
+    elif re.search(r'\b(inalat[oó]ri[ao]|neb|inal)\b', line, re.I):
+        route = "Inalatório"
+    elif re.search(r'\b(t[oó]pic[ao]|creme|pomada)\b', line, re.I):
+        route = "Tópico"
+    elif re.search(r'\b(vo|oral)\b', line, re.I):
+        route = "VO (Oral)"
+
+    # Regex de Frequência e Indicadores SN / QN / SOS
+    if re.search(r'\b(sn|qn|sos|se\s+necess[aá]rio|quando\s+necess[aá]rio|a\s+crit[eé]rio\s+m[eé]dico|acm)\b', line, re.I):
+        is_sn = True
+        freq = "SN (Se Necessário)"
+    else:
+        m_freq = re.search(r'(\b\d{1,2}\s*/\s*\d{1,2}\s*h|\b\d{1,2}\s*em\s*\d{1,2}\s*h|\b\d{1,2}x\s*/\s*dia|\b\d{1,2}x\s*ao\s*dia|\b1x\b|\b2x\b|\b3x\b|\b4x\b|\bmanh[aã]\b|\bnoite\b|\b12/12h\b|\b8/8h\b|\b6/6h\b|\b24/24h\b)', line, re.I)
+        if m_freq:
+            freq = m_freq.group(1).strip()
+
+    return dose, route, freq, is_sn
+
 @app.post("/api/v1/prescription/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
     contents = await file.read()
-    found_drugs = set()
+    extracted_items = []
+    seen = set()
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             for page in pdf.pages:
@@ -357,23 +426,43 @@ async def extract_pdf(file: UploadFile = File(...)):
                     if not line_clean:
                         continue
                     matched = clinical_rules.identify_drug_canonical(line_clean)
-                    if matched:
-                        found_drugs.add(matched.capitalize())
+                    if matched and matched not in seen:
+                        seen.add(matched)
+                        dose, route, freq, is_sn = extract_posology_details(line_clean)
+                        extracted_items.append({
+                            "name": matched.capitalize(),
+                            "dose": dose,
+                            "route": route,
+                            "frequency": freq,
+                            "is_sos": is_sn
+                        })
                     else:
                         for w in line_clean.split():
                             w_clean = w.strip(".,;:()[]{}")
                             if len(w_clean) >= 4:
                                 m_word = clinical_rules.identify_drug_canonical(w_clean)
-                                if m_word:
-                                    found_drugs.add(m_word.capitalize())
+                                if m_word and m_word not in seen:
+                                    seen.add(m_word)
+                                    dose, route, freq, is_sn = extract_posology_details(line_clean)
+                                    extracted_items.append({
+                                        "name": m_word.capitalize(),
+                                        "dose": dose,
+                                        "route": route,
+                                        "frequency": freq,
+                                        "is_sos": is_sn
+                                    })
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
 
-    drug_list = sorted(list(found_drugs))
-    return {"medications": drug_list, "drugs": drug_list}
+    drug_names = [it["name"] for it in extracted_items]
+    return {
+        "medications": drug_names,
+        "drugs": drug_names,
+        "items": extracted_items
+    }
 
 # ==============================================================================
-# PÁGINA PRINCIPAL
+# SERVIR PÁGINA PRINCIPAL
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
