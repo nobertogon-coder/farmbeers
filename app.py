@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-FarmBeers Web API - Servidor Principal FastAPI + PostgreSQL
-Persistência Permanente de Triagens e Gestão de Contas CFT
-"""
 import os
 import io
 import datetime
@@ -18,15 +14,13 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# CONFIGURAÇÃO DE CONEXÃO COM O BANCO DE DADOS POSTGRESQL DO RENDER
+# CONFIGURAÇÃO DO BANCO POSTGRESQL (PERSISTÊNCIA PERMANENTE)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 
-# Ajuste automático do prefixo do Render
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Conexão compatível (ignora check_same_thread quando conectado ao PostgreSQL)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
@@ -65,7 +59,6 @@ class ScreeningAlertRecord(Base):
     recommendation = Column(String(1000), nullable=False)
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
-# Criação automática de tabelas na inicialização do serviço
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -75,7 +68,6 @@ def get_db():
     finally:
         db.close()
 
-# Criação automática dos logins padrão se o banco estiver vazio
 def init_default_users():
     db = SessionLocal()
     try:
@@ -96,9 +88,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# INICIALIZAÇÃO FASTAPI
+# FASTAPI CONFIG
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.0.0")
+app = FastAPI(title="FarmBeers System API", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,7 +101,7 @@ app.add_middleware(
 )
 
 # ==============================================================================
-# ESQUEMAS DE REQUISIÇÃO (PYDANTIC)
+# SCHEMAS PYDANTIC
 # ==============================================================================
 class LoginRequest(BaseModel):
     username: str
@@ -139,7 +131,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput]
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO E PRESENÇA EM TEMPO REAL
+# ROTAS DE AUTENTICAÇÃO E SESSÃO
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -170,7 +162,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS
+# ROTAS DE ADMINISTRAÇÃO E CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -230,9 +222,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
-# ==============================================================================
-# RELATÓRIOS E INDICADORES CFT
-# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(ScreeningRecord).filter(func.extract('year', ScreeningRecord.created_at) == year)
@@ -269,13 +258,12 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# MOTOR DE PROCESSAMENTO DE TRIAGEM FARMBEERS
+# MOTOR DE TRIAGEM FARMBEERS
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     med_names = [m.name for m in payload.medications]
     
-    # Processa os alertas clínicos com tolerância total a sinônimos
     alerts = clinical_rules.evaluate_patient_beers(
         medications=med_names,
         age=payload.age,
@@ -315,7 +303,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "alert_tag": ""
             })
 
-    # Gravação permanente no banco PostgreSQL
     record = ScreeningRecord(
         pharmacist_username="admin",
         sector=payload.sector,
@@ -343,7 +330,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PRESCRIÇÃO PDF
+# EXTRAÇÃO DE PDF ROBUSTA (COMPATÍVEL COM TODOS OS NOMES DE PROPRIEDADE)
 # ==============================================================================
 @app.post("/api/v1/prescription/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
@@ -360,12 +347,10 @@ async def extract_pdf(file: UploadFile = File(...)):
                     line_clean = line.strip()
                     if not line_clean:
                         continue
-                    # Tenta identificar o fármaco na linha completa
                     matched = clinical_rules.identify_drug_canonical(line_clean)
                     if matched:
                         found_drugs.add(matched.capitalize())
                     else:
-                        # Tenta por palavras individuais
                         for w in line_clean.split():
                             w_clean = w.strip(".,;:()[]{}")
                             if len(w_clean) >= 4:
@@ -375,7 +360,15 @@ async def extract_pdf(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao processar PDF: {str(e)}")
 
-    return {"medications": sorted(list(found_drugs))}
+    drug_list = sorted(list(found_drugs))
+    items_objects = [{"name": d, "dose": "", "route": "VO (Oral)", "frequency": ""} for d in drug_list]
+
+    # Retorna em todas as estruturas possíveis para alimentar qualquer frontend
+    return {
+        "medications": drug_list,
+        "drugs": drug_list,
+        "items": items_objects
+    }
 
 # ==============================================================================
 # CARREGAMENTO ESTÁTICO DO FRONTEND
