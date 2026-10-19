@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-FarmBeers Backend API - Servidor Oficial
-Compatibilidade 100% com o index.html original (refreshUnifiedTable + processCompleteScreening)
+FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
+Compatibilidade 100% com o index.html original
 """
 import os
 import io
 import datetime
-from typing import List, Optional, Any
+from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +18,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# CONEXÃO COM O POSTGRESQL DO RENDER (PERSISTÊNCIA PERMANENTE)
+# BANCO DE DADOS POSTGRESQL (PERSISTÊNCIA PERMANENTE)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -30,9 +30,6 @@ engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# ==============================================================================
-# BANCO DE DADOS - MODELOS
-# ==============================================================================
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -93,7 +90,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.3.0")
+app = FastAPI(title="FarmBeers System API", version="3.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,7 +100,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelos Flexíveis de Entrada (Nunca falham com campos vazios)
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -132,7 +128,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput] = []
 
 # ==============================================================================
-# AUTENTICAÇÃO
+# ROTAS DE AUTENTICAÇÃO
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -162,7 +158,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS & INDICADORES
+# ROTAS DE ADMINISTRAÇÃO E INDICADORES CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -254,14 +250,13 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# PROCESSAMENTO DE TRIAGEM (REFRESH DA TABELA + PARECER CLÍNICO)
+# MOTOR DE TRIAGEM FARMBEERS
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     patient_age = payload.age if (payload.age and payload.age > 0) else 70
     med_names = [m.name for m in payload.medications]
     
-    # Avaliação Clínica
     alerts_raw = clinical_rules.evaluate_patient_beers(
         medications=med_names,
         age=patient_age,
@@ -270,20 +265,18 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-    # Garante que todos os campos exigidos pelo HTML estejam presentes
     alerts_complete = []
     for a in alerts_raw:
         alerts_complete.append({
             "drug": a.get("drug", "Medicamento"),
-            "axis": a.get("axis", "Critério de Beers 2023"),
+            "axis": a.get("axis", "AGS Beers 2023"),
             "recommendation": a.get("recommendation", "Reavaliar prescrição."),
-            "rationale": a.get("rationale", "Medicamento com alto potencial de eventos adversos na população idosa."),
+            "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
             "tapering": a.get("tapering", "")
         })
 
     alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
     
-    # Monta rigorosamente as linhas da tabela (Item 4)
     med_rows = []
     for m in payload.medications:
         canonical = clinical_rules.identify_drug_canonical(m.name)
@@ -298,7 +291,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                         matched = v
                         break
 
-        # Combinação de dose, via e frequência
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
 
@@ -317,7 +309,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "alert_tag": ""
             })
 
-    # Persistência no PostgreSQL
     if payload.medications:
         try:
             record = ScreeningRecord(
@@ -349,7 +340,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR
+# EXTRAÇÃO DE PRESCRIÇÃO HOSPITALAR (PDF)
 # ==============================================================================
 @app.post("/api/v1/prescription/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
