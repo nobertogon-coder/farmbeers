@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-FarmBeers - Motor Clínico Oficial (AGS Beers Criteria 2023)
-Mapeamento dos 72 Fármacos Hospitalares Brasileiros Padronizados
+FarmBeers - Motor Clínico AGS Beers 2023
+Mapeamento Canônico com Reconhecimento Inteligente por Expressões Regulares
 """
 import re
 import unicodedata
@@ -15,11 +15,10 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return " ".join(text.split())
 
-# ==============================================================================
-# BASE DE REGRAS CLÍNICAS AGS BEERS 2023 COM RECOMENDAÇÃO, RACIONAL E TAPERING
-# ==============================================================================
 BEERS_RULES = {
+    # --------------------------------------------------------------------------
     # ANTI-HISTAMÍNICOS DE 1ª GERAÇÃO (TABELA 2)
+    # --------------------------------------------------------------------------
     "dexclorfeniramina": {
         "drug": "Dexclorfeniramina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -56,7 +55,9 @@ BEERS_RULES = {
         "tapering": "Interrupção imediata."
     },
 
-    # ANTIESPASMÓDICOS E ANTICOLINÉRGICOS DIVERSOS
+    # --------------------------------------------------------------------------
+    # ANTICOLINÉRGICOS E ANTIESPASMÓDICOS DIVERSOS
+    # --------------------------------------------------------------------------
     "escopolamina": {
         "drug": "Escopolamina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -79,7 +80,9 @@ BEERS_RULES = {
         "tapering": "Desprescrever gradualmente; considerar fisioterapia uroginecológica ou agonista beta-3 (Mirabegrona)."
     },
 
-    # BENZODIAZEPÍNICOS E SEDATIVOS (TABELA 2 E 3)
+    # --------------------------------------------------------------------------
+    # BENZODIAZEPÍNICOS E HIPNÓTICOS (TABELAS 2 E 3)
+    # --------------------------------------------------------------------------
     "diazepam": {
         "drug": "Diazepam",
         "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
@@ -130,7 +133,9 @@ BEERS_RULES = {
         "tapering": "Desmame em 7 a 10 dias."
     },
 
+    # --------------------------------------------------------------------------
     # NEUROLÉPTICOS E ANTIDEPRESSIVOS TRICÍCLICOS
+    # --------------------------------------------------------------------------
     "amitriptilina": {
         "drug": "Amitriptilina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -195,7 +200,9 @@ BEERS_RULES = {
         "tapering": "Usar a menor dose eficaz e limitar a duração ao menor tempo possível."
     },
 
+    # --------------------------------------------------------------------------
     # GASTROINTESTINAIS E MOTILIDADE
+    # --------------------------------------------------------------------------
     "metoclopramida": {
         "drug": "Metoclopramida",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -225,7 +232,9 @@ BEERS_RULES = {
         "tapering": "Substituir por laxantes osmóticos seguros (ex.: Lactulose ou Macrogol / PEG)."
     },
 
+    # --------------------------------------------------------------------------
     # RELAXANTES MUSCULARES
+    # --------------------------------------------------------------------------
     "ciclobenzaprina": {
         "drug": "Ciclobenzaprina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -248,7 +257,9 @@ BEERS_RULES = {
         "tapering": "Substituir por dipirona ou paracetamol isolados."
     },
 
+    # --------------------------------------------------------------------------
     # AINES
+    # --------------------------------------------------------------------------
     "diclofenaco": {
         "drug": "Diclofenaco",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso crônico)",
@@ -299,7 +310,9 @@ BEERS_RULES = {
         "tapering": "Suspensão imediata."
     },
 
+    # --------------------------------------------------------------------------
     # CARDIOVASCULARES
+    # --------------------------------------------------------------------------
     "digoxina": {
         "drug": "Digoxina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar como 1ª linha / Dose > 0.125mg)",
@@ -350,7 +363,9 @@ BEERS_RULES = {
         "tapering": "Se utilizada para HPB, manter monitoramento pressórico sentado/em pé rigoroso."
     },
 
+    # --------------------------------------------------------------------------
     # HIPOGLICEMIANTES
+    # --------------------------------------------------------------------------
     "glibenclamida": {
         "drug": "Glibenclamida",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -366,7 +381,9 @@ BEERS_RULES = {
         "tapering": "Transicionar para opções com menor risco de hipoglicemia."
     },
 
+    # --------------------------------------------------------------------------
     # OPIOIDES E DIVERSOS
+    # --------------------------------------------------------------------------
     "tramadol": {
         "drug": "Tramadol",
         "axis": "AGS Beers 2023 - Tabela 2 e 5 (Evitar / Risco de SIADH e Síndrome Serotoninérgica)",
@@ -397,11 +414,8 @@ BEERS_RULES = {
     }
 }
 
-# ==============================================================================
-# DICIONÁRIO DE SINÔNIMOS E NOMES COMERCIAIS BRASILEIROS
-# ==============================================================================
 SYNONYM_MAP = {
-    # Dexclorfeniramina
+    # Dexclorfeniramina e sinônimos
     "dexclorfeniramina": "dexclorfeniramina",
     "maleato de dexclorfeniramina": "dexclorfeniramina",
     "polaramine": "dexclorfeniramina",
@@ -541,7 +555,6 @@ SYNONYM_MAP = {
 }
 
 def identify_drug_canonical(input_text: str) -> Optional[str]:
-    """Identifica o fármaco canônico com tolerância a doses, vias e texto embutido."""
     if not input_text:
         return None
 
@@ -565,9 +578,6 @@ def identify_drug_canonical(input_text: str) -> Optional[str]:
 def lookup_hospital_drug(name: str) -> Optional[str]:
     return identify_drug_canonical(name)
 
-# ==============================================================================
-# MOTOR DE AVALIAÇÃO DE BEERS 2023
-# ==============================================================================
 def evaluate_patient_beers(
     medications: List[str],
     age: int,
@@ -575,7 +585,6 @@ def evaluate_patient_beers(
     conditions: Optional[List[str]] = None,
     crcl: Optional[float] = None
 ) -> List[Dict[str, Any]]:
-    """Gera a lista completa de pareceres clínicos no formato esperado pelo index.html."""
     alerts = []
     conditions = conditions or []
 
