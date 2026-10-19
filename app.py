@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Parser Avançado com Regex de Doses/Vias/Posologia (SN/QN/SOS) e Criptografia SHA-256
+Compatibilidade Total com o Banco Existente, Hash Seguro e SN/QN
 """
 import os
 import io
@@ -40,7 +40,8 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    password_hash = Column(String(100), nullable=False)
+    # Mantem estritamente o nome original 'password' para não conflitar com a coluna existente no banco
+    password = Column(String(100), nullable=False)
     role = Column(String(20), default="pharmacist")
     is_active = Column(Boolean, default=True)
     last_ping = Column(DateTime, default=datetime.datetime.utcnow)
@@ -83,17 +84,23 @@ def init_default_users():
             ("Teste", "teste123", "pharmacist")
         ]
         for u, p, r in defaults:
-            exists = db.query(User).filter(User.username == u).first()
-            if not exists:
-                user = User(
+            user = db.query(User).filter(User.username == u).first()
+            if not user:
+                new_user = User(
                     username=u,
-                    password_hash=hash_password(p),
+                    password=hash_password(p),
                     role=r,
                     is_active=True,
                     last_ping=datetime.datetime.utcnow()
                 )
-                db.add(user)
+                db.add(new_user)
+            else:
+                # Se a senha estava em texto plano no banco, atualiza para hash seguro
+                if user.password == p:
+                    user.password = hash_password(p)
         db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
 
@@ -102,7 +109,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI CONFIGURAÇÃO
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.6.0")
+app = FastAPI(title="FarmBeers System API", version="3.6.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,26 +148,27 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput] = []
 
 # ==============================================================================
-# AUTENTICAÇÃO COM HASH SHA-256
+# AUTENTICAÇÃO COM HASH E TOLERÂNCIA
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     pwd_h = hash_password(payload.password)
-    user = db.query(User).filter(User.username == payload.username, User.password_hash == pwd_h).first()
-    
-    # Retrocompatibilidade automática se o banco ainda tiver senhas em texto puro
-    if not user:
-        legacy_user = db.query(User).filter(User.username == payload.username, User.password_hash == payload.password).first()
-        if legacy_user:
-            legacy_user.password_hash = pwd_h
-            db.commit()
-            user = legacy_user
+    user = db.query(User).filter(User.username == payload.username).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+
+    # Valida contra o hash ou contra o texto plano (caso ainda nao tenha migrado)
+    if user.password != pwd_h and user.password != payload.password:
+        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
+
+    # Atualiza para hash caso estivesse em texto puro
+    if user.password == payload.password:
+        user.password = pwd_h
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Acesso bloqueado pela administração.")
-    
+
     user.last_ping = datetime.datetime.utcnow()
     db.commit()
     return {"status": "ok", "user": {"id": user.id, "username": user.username, "role": user.role}}
@@ -207,7 +215,7 @@ def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
     new_u = User(
         username=payload.username,
-        password_hash=hash_password(payload.password),
+        password=hash_password(payload.password),
         role=payload.role,
         is_active=True,
         last_ping=datetime.datetime.utcnow()
@@ -245,7 +253,7 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
         q = q.filter(func.extract('month', ScreeningRecord.created_at) == month)
     if day:
         q = q.filter(func.extract('day', ScreeningRecord.created_at) == day)
-    
+
     screenings = q.all()
     total_patients = len(screenings)
     count_upi = sum(1 for s in screenings if s.sector == "UPI (Enfermaria)")
@@ -280,7 +288,7 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     patient_age = payload.age if (payload.age and payload.age > 0) else 70
     med_dicts = [m.model_dump() for m in payload.medications]
-    
+
     alerts_raw = clinical_rules.evaluate_patient_beers(
         medications=med_dicts,
         age=patient_age,
@@ -301,7 +309,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         })
 
     alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
-    
+
     med_rows = []
     for m in payload.medications:
         canonical = clinical_rules.identify_drug_canonical(m.name)
@@ -318,8 +326,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
-        
-        # Indica visualmente se é SN / QN
+
         is_sn_flag = bool(m.is_sos) or any(t in dose_route_str.lower() for t in ["sn", "qn", "sos"])
         if is_sn_flag and "[SN/QN]" not in dose_route_str:
             dose_route_str = f"{dose_route_str} [SN/QN]"
@@ -372,7 +379,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR INTELIGENTE (REGEX DE DOSE, VIA E SN/QN)
+# EXTRAÇÃO DE PDF COM REGEX DE DOSES, VIAS E SN/QN
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
@@ -380,12 +387,10 @@ def extract_posology_details(line: str):
     freq = ""
     is_sn = False
 
-    # Regex de Dosagem (ex: 4mg, 500mg, 1g, 20 gotas, 1 amp, 2 cp)
     m_dose = re.search(r'(\b\d+[\.,]?\d*\s*(?:mg|g|mcg|ml|gotas|gota|ampola|amp|cp|comp|frasco)\b)', line, re.I)
     if m_dose:
         dose = m_dose.group(1).strip()
 
-    # Regex de Via de Administração Hospitalar
     if re.search(r'\b(iv|ev|endovenos[ao]|intravenos[ao])\b', line, re.I):
         route = "IV (Endovenoso)"
     elif re.search(r'\b(im|intramuscular)\b', line, re.I):
@@ -399,7 +404,6 @@ def extract_posology_details(line: str):
     elif re.search(r'\b(vo|oral)\b', line, re.I):
         route = "VO (Oral)"
 
-    # Regex de Frequência e Indicadores SN / QN / SOS
     if re.search(r'\b(sn|qn|sos|se\s+necess[aá]rio|quando\s+necess[aá]rio|a\s+crit[eé]rio\s+m[eé]dico|acm)\b', line, re.I):
         is_sn = True
         freq = "SN (Se Necessário)"
@@ -462,7 +466,7 @@ async def extract_pdf(file: UploadFile = File(...)):
     }
 
 # ==============================================================================
-# SERVIR PÁGINA PRINCIPAL
+# PÁGINA PRINCIPAL
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
