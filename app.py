@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+FarmBeers Backend API - FastAPI + PostgreSQL Permanente
+Compatibilidade estrita com o index.html oficial (PDF review modal, auth e persistência)
+"""
 import os
 import io
 import datetime
@@ -14,7 +18,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# CONFIGURAÇÃO DO BANCO POSTGRESQL (PERSISTÊNCIA PERMANENTE)
+# BANCO DE DADOS POSTGRESQL (PERSISTÊNCIA PERMANENTE NO RENDER)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 
@@ -27,9 +31,6 @@ engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# ==============================================================================
-# MODELOS DE DADOS RELACIONAIS (ORM)
-# ==============================================================================
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -88,9 +89,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI CONFIG
+# FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.1.0")
+app = FastAPI(title="FarmBeers System API", version="3.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -100,9 +101,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==============================================================================
-# SCHEMAS PYDANTIC
-# ==============================================================================
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -131,7 +129,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput]
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO E SESSÃO
+# AUTENTICAÇÃO E PRESENÇA
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -162,7 +160,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# ROTAS DE ADMINISTRAÇÃO E CFT
+# GESTÃO DE USUÁRIOS
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -222,6 +220,9 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# ==============================================================================
+# INDICADORES CLÍNICOS CFT
+# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(ScreeningRecord).filter(func.extract('year', ScreeningRecord.created_at) == year)
@@ -288,21 +289,23 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                         matched = v
                         break
 
+        dose_text = f"{m.dose} {m.route} {m.frequency}".strip()
         if matched:
             med_rows.append({
                 "name": m.name,
-                "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
+                "dose_route": dose_text or "VO (Oral)",
                 "is_beers": True,
-                "alert_tag": matched.get("axis", "Critério de Beers")
+                "alert_tag": matched.get("axis", "AGS Beers 2023")
             })
         else:
             med_rows.append({
                 "name": m.name,
-                "dose_route": f"{m.dose} {m.route} {m.frequency}".strip(),
+                "dose_route": dose_text or "VO (Oral)",
                 "is_beers": False,
                 "alert_tag": ""
             })
 
+    # Gravação permanente no PostgreSQL
     record = ScreeningRecord(
         pharmacist_username="admin",
         sector=payload.sector,
@@ -330,7 +333,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF ROBUSTA (COMPATÍVEL COM TODOS OS NOMES DE PROPRIEDADE)
+# EXTRAÇÃO DE PRESCRIÇÃO HOSPITALAR (PDF)
 # ==============================================================================
 @app.post("/api/v1/prescription/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
@@ -361,17 +364,15 @@ async def extract_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Erro ao processar PDF: {str(e)}")
 
     drug_list = sorted(list(found_drugs))
-    items_objects = [{"name": d, "dose": "", "route": "VO (Oral)", "frequency": ""} for d in drug_list]
 
-    # Retorna em todas as estruturas possíveis para alimentar qualquer frontend
+    # Retorna tanto em 'medications' quanto em 'drugs' para casamento perfeito com o script
     return {
         "medications": drug_list,
-        "drugs": drug_list,
-        "items": items_objects
+        "drugs": drug_list
     }
 
 # ==============================================================================
-# CARREGAMENTO ESTÁTICO DO FRONTEND
+# SERVIR O INDEX.HTML
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
