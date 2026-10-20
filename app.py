@@ -3,7 +3,7 @@
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
 Blindagem de Produção:
 - Filtro flexível de métricas por período (ano/mês/dia com fallback inteligente)
-- Persistência robusta com ID garantido para cada alerta (incluindo Tabela 4)
+- Persistência robusta com commit imediato para cada alerta (incluindo Tabela 4)
 - Auditoria de desfecho clínico ('accepted', 'rejected', 'not_applicable')
 - Engine resiliente com pool_pre_ping e pool_recycle
 """
@@ -118,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="5.0.0")
+app = FastAPI(title="FarmBeers System API", version="5.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +200,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT (FILTRAGEM CORRIGIDA)
+# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -256,20 +256,16 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
-# ==============================================================================
-# ROTA DE MÉTRICAS DA CFT - CORRIGIDA E BLINDADA
-# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
-    year: Optional[str] = None, 
-    month: Optional[str] = None, 
-    day: Optional[str] = None, 
+    year: Optional[str] = None,
+    month: Optional[str] = None,
+    day: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     try:
         q = db.query(ScreeningRecord)
 
-        # Conversão segura de filtros (ignora se vier vazio ou "null")
         if year and year.strip().isdigit() and int(year) > 0:
             q = q.filter(func.extract('year', ScreeningRecord.created_at) == int(year))
         if month and month.strip().isdigit() and int(month) > 0:
@@ -280,7 +276,6 @@ def get_metrics(
         screenings = q.order_by(desc(ScreeningRecord.created_at)).all()
         total_patients = len(screenings)
 
-        # Contagem insensível a maiúsculas/minúsculas
         count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower() or "enfermaria" in (s.sector or "").lower())
         count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
 
@@ -296,7 +291,6 @@ def get_metrics(
             total_beers_alerts = total_registered_alerts
             accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
 
-            # Ranking Top 5 Fármacos
             rows = (
                 db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
                 .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
@@ -360,7 +354,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-persisted_records = []
+    persisted_records = []
     if payload.medications:
         try:
             record = ScreeningRecord(
