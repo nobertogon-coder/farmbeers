@@ -256,59 +256,81 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# ==============================================================================
+# ROTA DE MÉTRICAS DA CFT - CORRIGIDA E BLINDADA
+# ==============================================================================
 @app.get("/api/v1/admin/metrics")
-def get_metrics(year: Optional[int] = None, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(ScreeningRecord)
+def get_metrics(
+    year: Optional[str] = None, 
+    month: Optional[str] = None, 
+    day: Optional[str] = None, 
+    db: Session = Depends(get_db)
+):
+    try:
+        q = db.query(ScreeningRecord)
 
-    # Aplica filtros de data apenas se fornecidos
-    if year and year > 0:
-        q = q.filter(func.extract('year', ScreeningRecord.created_at) == year)
-    if month and month > 0:
-        q = q.filter(func.extract('month', ScreeningRecord.created_at) == month)
-    if day and day > 0:
-        q = q.filter(func.extract('day', ScreeningRecord.created_at) == day)
+        # Conversão segura de filtros (ignora se vier vazio ou "null")
+        if year and year.strip().isdigit() and int(year) > 0:
+            q = q.filter(func.extract('year', ScreeningRecord.created_at) == int(year))
+        if month and month.strip().isdigit() and int(month) > 0:
+            q = q.filter(func.extract('month', ScreeningRecord.created_at) == int(month))
+        if day and day.strip().isdigit() and int(day) > 0:
+            q = q.filter(func.extract('day', ScreeningRecord.created_at) == int(day))
 
-    screenings = q.all()
-    total_patients = len(screenings)
-    count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower())
-    count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
+        screenings = q.order_by(desc(ScreeningRecord.created_at)).all()
+        total_patients = len(screenings)
 
-    s_ids = [s.id for s in screenings]
-    total_beers_alerts = 0
-    accepted_interventions = 0
-    total_registered_alerts = 0
-    top_5 = []
+        # Contagem insensível a maiúsculas/minúsculas
+        count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower() or "enfermaria" in (s.sector or "").lower())
+        count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
 
-    if s_ids:
-        all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
-        total_registered_alerts = len(all_alerts)
-        total_beers_alerts = total_registered_alerts
-        accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
+        s_ids = [s.id for s in screenings]
+        total_beers_alerts = 0
+        accepted_interventions = 0
+        total_registered_alerts = 0
+        top_5 = []
 
-        rows = (
-            db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
-            .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
-            .group_by(ScreeningAlertRecord.drug_name)
-            .order_by(desc("total"))
-            .limit(5)
-            .all()
-        )
-        top_5 = [{"drug": r[0], "count": r[1]} for r in rows]
-    else:
-        # Se nenhum filtro encontrou, conta a soma dos screenings
-        total_beers_alerts = sum(s.total_alerts for s in screenings)
+        if s_ids:
+            all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
+            total_registered_alerts = len(all_alerts)
+            total_beers_alerts = total_registered_alerts
+            accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
 
-    acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
+            # Ranking Top 5 Fármacos
+            rows = (
+                db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
+                .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
+                .group_by(ScreeningAlertRecord.drug_name)
+                .order_by(desc("total"))
+                .limit(5)
+                .all()
+            )
+            top_5 = [{"drug": str(r[0]), "count": int(r[1])} for r in rows]
+        else:
+            total_beers_alerts = sum(s.total_alerts for s in screenings)
 
-    return {
-        "total_patients": total_patients,
-        "count_upi": count_upi,
-        "count_uti": count_uti,
-        "total_beers_alerts": total_beers_alerts,
-        "accepted_interventions": accepted_interventions,
-        "acceptance_rate": acceptance_rate,
-        "top_5_beers": top_5
-    }
+        acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
+
+        return {
+            "total_patients": total_patients,
+            "count_upi": count_upi,
+            "count_uti": count_uti,
+            "total_beers_alerts": total_beers_alerts,
+            "accepted_interventions": accepted_interventions,
+            "acceptance_rate": acceptance_rate,
+            "top_5_beers": top_5
+        }
+    except Exception as e:
+        print(f"Erro em metrics: {e}")
+        return {
+            "total_patients": 0,
+            "count_upi": 0,
+            "count_uti": 0,
+            "total_beers_alerts": 0,
+            "accepted_interventions": 0,
+            "acceptance_rate": 0.0,
+            "top_5_beers": []
+        }
 
 # ==============================================================================
 # AUDITORIA E ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO
