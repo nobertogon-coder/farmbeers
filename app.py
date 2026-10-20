@@ -360,35 +360,37 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-    persisted_records = []
+persisted_records = []
     if payload.medications:
         try:
             record = ScreeningRecord(
                 pharmacist_username="admin",
-                sector=payload.sector or "UPI (Enfermaria)",
-                patient_age=patient_age,
-                crcl_ml_min=payload.crcl_ml_min,
-                acb_score=acb_total,
+                sector=str(payload.sector or "UPI (Enfermaria)"),
+                patient_age=int(patient_age),
+                crcl_ml_min=float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None,
+                acb_score=int(acb_total),
                 total_alerts=len(alerts_raw)
             )
             db.add(record)
-            db.flush()
+            db.commit()
+            db.refresh(record)
 
             for a in alerts_raw:
-                d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
+                d_name = str(a.get("drug") or a.get("drug_name") or "Medicamento")
                 alert_rec = ScreeningAlertRecord(
                     screening_id=record.id,
                     drug_name=d_name,
-                    axis=a.get("axis", "AGS Beers 2023"),
-                    recommendation=a.get("recommendation", "Reavaliar prescrição."),
+                    axis=str(a.get("axis", "AGS Beers 2023")),
+                    recommendation=str(a.get("recommendation", "Reavaliar prescrição.")),
                     outcome="pending"
                 )
                 db.add(alert_rec)
-                db.flush()
+                db.commit()
+                db.refresh(alert_rec)
                 persisted_records.append(alert_rec.id)
-            db.commit()
-        except Exception:
+        except Exception as err:
             db.rollback()
+            print(f"Erro ao salvar triagem: {err}")
 
     alerts_complete = []
     for idx, a in enumerate(alerts_raw):
