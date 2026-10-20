@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Compatibilidade Total com o Banco Existente, Hash Seguro e SN/QN
+Com:
+- Engine blindada para Render (pool_pre_ping e pool_recycle)
+- Compatibilidade estrita com a coluna 'password' existente
+- Extração inteligente de PDF por regex (Dose, Via e SN/QN)
+- Suporte completo ao Escore Anticolinérgico (ACB Score)
 """
 import os
 import io
@@ -20,7 +24,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# BANCO DE DADOS POSTGRESQL (PERSISTÊNCIA PERMANENTE)
+# CONFIGURAÇÃO DE BANCO DE DADOS BLINDADA CONTRA DESCONEXÕES
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -28,7 +32,13 @@ if DATABASE_URL.startswith("postgres://"):
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_pre_ping testa a conexão antes de executar queries e pool_recycle evita conexões mortas no Render
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_recycle=300
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -40,7 +50,7 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    # Mantem estritamente o nome original 'password' para não conflitar com a coluna existente no banco
+    # Mantém o nome 'password' para preservar a estrutura da tabela criada no PostgreSQL
     password = Column(String(100), nullable=False)
     role = Column(String(20), default="pharmacist")
     is_active = Column(Boolean, default=True)
@@ -95,7 +105,6 @@ def init_default_users():
                 )
                 db.add(new_user)
             else:
-                # Se a senha estava em texto plano no banco, atualiza para hash seguro
                 if user.password == p:
                     user.password = hash_password(p)
         db.commit()
@@ -107,9 +116,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI CONFIGURAÇÃO
+# FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.6.1")
+app = FastAPI(title="FarmBeers System API", version="3.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,7 +157,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput] = []
 
 # ==============================================================================
-# AUTENTICAÇÃO COM HASH E TOLERÂNCIA
+# AUTENTICAÇÃO COM HASH CRIPTOGRÁFICO
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -158,11 +167,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
 
-    # Valida contra o hash ou contra o texto plano (caso ainda nao tenha migrado)
     if user.password != pwd_h and user.password != payload.password:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
 
-    # Atualiza para hash caso estivesse em texto puro
     if user.password == payload.password:
         user.password = pwd_h
 
@@ -190,7 +197,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS & INDICADORES CFT
+# ADMINISTRAÇÃO E CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -282,14 +289,14 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM ESTRATIFICAÇÃO SN/QN/SOS E VIGILÂNCIA RENAL
+# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA (ACB SCORE)
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     patient_age = payload.age if (payload.age and payload.age > 0) else 70
     med_dicts = [m.model_dump() for m in payload.medications]
 
-    alerts_raw = clinical_rules.evaluate_patient_beers(
+    alerts_raw, acb_total, acb_text = clinical_rules.evaluate_patient_beers(
         medications=med_dicts,
         age=patient_age,
         fall_risk=bool(payload.fall_risk),
@@ -299,13 +306,16 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
     alerts_complete = []
     for a in alerts_raw:
+        d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
         alerts_complete.append({
-            "drug": a.get("drug", "Medicamento"),
+            "drug": d_name,
+            "drug_name": d_name,
             "axis": a.get("axis", "AGS Beers 2023"),
             "recommendation": a.get("recommendation", "Reavaliar prescrição."),
             "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
             "tapering": a.get("tapering", ""),
-            "is_sos": a.get("is_sos", False)
+            "is_sos": a.get("is_sos", False),
+            "acb_score": a.get("acb_score", 0)
         })
 
     alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
@@ -374,12 +384,14 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
     return {
         "total_beers_alerts": len(alerts_complete),
+        "acb_score": acb_total,
+        "acb_interpretation": acb_text,
         "alerts": alerts_complete,
         "medication_rows": med_rows
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF COM REGEX DE DOSES, VIAS E SN/QN
+# EXTRAÇÃO DE PDF HOSPITALAR VIA REGEX
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
@@ -466,7 +478,7 @@ async def extract_pdf(file: UploadFile = File(...)):
     }
 
 # ==============================================================================
-# PÁGINA PRINCIPAL
+# CARREGAMENTO DA INTERFACE WEB
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
