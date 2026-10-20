@@ -786,52 +786,58 @@
       }
     }
 
-    function clearMetricsFilter() {
-      document.getElementById("filterDay").value = "";
-      document.getElementById("filterMonth").value = "";
-      document.getElementById("filterYear").value = "";
+function clearMetricsFilter() {
+      const elDay = document.getElementById("filterDay");
+      const elMonth = document.getElementById("filterMonth");
+      const elYear = document.getElementById("filterYear");
+      if (elDay) elDay.value = "";
+      if (elMonth) elMonth.value = "";
+      if (elYear) elYear.value = "";
       loadMetricsData();
     }
 
     async function loadMetricsData() {
-      const day = document.getElementById("filterDay").value;
-      const month = document.getElementById("filterMonth").value;
-      const year = document.getElementById("filterYear").value;
+      const day = (document.getElementById("filterDay")?.value || "").trim();
+      const month = (document.getElementById("filterMonth")?.value || "").trim();
+      const year = (document.getElementById("filterYear")?.value || "").trim();
 
-      let params = new URLSearchParams();
+      const params = new URLSearchParams();
       if (year) params.append("year", year);
       if (month) params.append("month", month);
       if (day) params.append("day", day);
 
-      const qs = params.toString() ? `?${params.toString()}` : "";
+      const url = params.toString() ? `/api/v1/admin/metrics?${params.toString()}` : `/api/v1/admin/metrics`;
 
       try {
-        const res = await fetch(`/api/v1/admin/metrics${qs}`);
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erro na resposta do servidor");
         const data = await res.json();
 
-        document.getElementById("metricTotalPatients").innerText = data.total_patients || 0;
-        document.getElementById("metricTotalUPI").innerText = data.count_upi || 0;
-        document.getElementById("metricTotalUTI").innerText = data.count_uti || 0;
-        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts || 0;
-        document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate || 0}%`;
+        // Atualização direta e forçada no DOM
+        document.getElementById("metricTotalPatients").innerText = data.total_patients ?? 0;
+        document.getElementById("metricTotalUPI").innerText = data.count_upi ?? 0;
+        document.getElementById("metricTotalUTI").innerText = data.count_uti ?? 0;
+        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts ?? 0;
+        document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate ?? 0}%`;
 
         const tbody = document.getElementById("top5TableBody");
-        tbody.innerHTML = "";
-
-        if (data.top_5_beers && data.top_5_beers.length > 0) {
-          data.top_5_beers.forEach(item => {
-            tbody.innerHTML += `
-              <tr class="hover:bg-slate-50">
-                <td class="py-2 font-bold text-slate-800">${item.drug}</td>
-                <td class="py-2 text-right font-extrabold text-amber-600">${item.count}</td>
-              </tr>
-            `;
-          });
-        } else {
-          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado para este filtro.</td></tr>`;
+        if (tbody) {
+          tbody.innerHTML = "";
+          if (data.top_5_beers && data.top_5_beers.length > 0) {
+            data.top_5_beers.forEach(item => {
+              tbody.innerHTML += `
+                <tr class="hover:bg-slate-50">
+                  <td class="py-2 px-1 font-bold text-slate-800">${item.drug}</td>
+                  <td class="py-2 px-1 text-right font-extrabold text-amber-600">${item.count}</td>
+                </tr>
+              `;
+            });
+          } else {
+            tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado no período.</td></tr>`;
+          }
         }
       } catch (e) {
-        console.error("Erro ao carregar indicadores:", e);
+        console.error("Falha ao atualizar métricas:", e);
       }
     }
 
