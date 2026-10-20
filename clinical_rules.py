@@ -24,7 +24,6 @@ def normalize_text(text: str) -> str:
 # PONTUAÇÃO DE CARGA ANTICOLINÉRGICA (ACB SCORE)
 # ==============================================================================
 ACB_SCORE_MAP = {
-    # Nível 3 (Anticolinérgicos Severos)
     "dexclorfeniramina": 3,
     "hidroxizina": 3,
     "prometazina": 3,
@@ -39,12 +38,8 @@ ACB_SCORE_MAP = {
     "clorpromazina": 3,
     "levomepromazina": 3,
     "orfenadrina": 3,
-
-    # Nível 2 (Moderados)
     "ciclobenzaprina": 2,
     "carisoprodol": 2,
-
-    # Nível 1 (Baixa / Potencial)
     "diazepam": 1,
     "clonazepam": 1,
     "lorazepam": 1,
@@ -57,9 +52,6 @@ ACB_SCORE_MAP = {
     "clonidina": 1
 }
 
-# ==============================================================================
-# BASE DE REGRAS CLÍNICAS (AGS BEERS 2023 + MODELO CANADENSE)
-# ==============================================================================
 BEERS_RULES = {
     "dexclorfeniramina": {
         "drug": "Dexclorfeniramina",
@@ -522,9 +514,6 @@ BEERS_RULES = {
     }
 }
 
-# ==============================================================================
-# DICIONÁRIO DE SINÔNIMOS AMPLIADO (NOMES COMERCIAIS BRASILEIROS)
-# ==============================================================================
 SYNONYM_MAP = {
     "dexclorfeniramina": "dexclorfeniramina",
     "maleato de dexclorfeniramina": "dexclorfeniramina",
@@ -642,8 +631,6 @@ SYNONYM_MAP = {
     "meperidina": "meperidina",
     "petidina": "meperidina",
     "dolantina": "meperidina",
-
-    # Fármacos adicionais mapeados para Interações da Tabela 4
     "losartana": "losartana",
     "enalapril": "enalapril",
     "captopril": "captopril",
@@ -684,9 +671,6 @@ def identify_drug_canonical(input_text: str) -> Optional[str]:
 
     return None
 
-# ==============================================================================
-# DETECTOR DA TABELA 4 DE BEERS (INTERAÇÕES MEDICAMENTOSAS DE ALTO RISCO)
-# ==============================================================================
 def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     table_4_alerts = []
     med_tag_map = {}
@@ -699,7 +683,6 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
     anticoagulants = {"varfarina", "rivaroxabana", "apixabana", "dabigatrana", "enoxaparina", "heparina"}
     cns_drugs = opioids | bzds_and_z | {"haloperidol", "quetiapina", "olanzapina", "risperidona", "amitriptilina", "nortriptilina", "clomipramina"}
 
-    # Interação 1: Opioide + Benzodiazepínico / Droga Z
     found_op = meds.intersection(opioids)
     found_bzd = meds.intersection(bzds_and_z)
     if found_op and found_bzd:
@@ -716,7 +699,6 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
-    # Interação 2: IECA/BRA + Espironolactona
     found_ras = meds.intersection(ras_inhibitors)
     if found_ras and "espironolactona" in meds:
         for m in found_ras:
@@ -733,7 +715,6 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
-    # Interação 3: Anticoagulante + AINE
     found_anticoag = meds.intersection(anticoagulants)
     found_nsaid = meds.intersection(nsaids)
     if found_anticoag and found_nsaid:
@@ -750,7 +731,6 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
-    # Interação 4: 3 ou mais agentes ativos no SNC (Polifarmácia Psicotrópica)
     found_cns = meds.intersection(cns_drugs)
     if len(found_cns) >= 3:
         for m in found_cns:
@@ -769,9 +749,6 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
 
     return table_4_alerts, med_tag_map
 
-# ==============================================================================
-# MOTOR CONSOLIDADO DE AVALIAÇÃO DE BEERS 2023
-# ==============================================================================
 def evaluate_patient_beers(
     medications: List[Dict[str, Any]],
     age: int,
