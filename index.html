@@ -775,18 +775,19 @@
       loadUsersTable();
     }
 
-    function toggleMetricsModal(show) {
+function toggleMetricsModal(show) {
       const m = document.getElementById("metricsModal");
       if (show) {
         m.classList.remove("hidden");
+        // Carrega os dados imediatamente ao abrir o modal
         loadMetricsData();
-        lucide.createIcons();
+        if (window.lucide) lucide.createIcons();
       } else {
         m.classList.add("hidden");
       }
     }
 
-function clearMetricsFilter() {
+    function clearMetricsFilter() {
       const elDay = document.getElementById("filterDay");
       const elMonth = document.getElementById("filterMonth");
       const elYear = document.getElementById("filterYear");
@@ -802,24 +803,31 @@ function clearMetricsFilter() {
       const year = (document.getElementById("filterYear")?.value || "").trim();
 
       const params = new URLSearchParams();
-      if (year) params.append("year", year);
-      if (month) params.append("month", month);
-      if (day) params.append("day", day);
+      if (year && year !== "") params.append("year", year);
+      if (month && month !== "") params.append("month", month);
+      if (day && day !== "") params.append("day", day);
 
-      const url = params.toString() ? `/api/v1/admin/metrics?${params.toString()}` : `/api/v1/admin/metrics`;
+      const qs = params.toString() ? `?${params.toString()}` : "";
 
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Erro na resposta do servidor");
+        const res = await fetch(`/api/v1/admin/metrics${qs}`);
+        if (!res.ok) throw new Error("Falha HTTP " + res.status);
         const data = await res.json();
 
-        // Atualização direta e forçada no DOM
-        document.getElementById("metricTotalPatients").innerText = data.total_patients ?? 0;
-        document.getElementById("metricTotalUPI").innerText = data.count_upi ?? 0;
-        document.getElementById("metricTotalUTI").innerText = data.count_uti ?? 0;
-        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts ?? 0;
-        document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate ?? 0}%`;
+        // Força a inserção dos valores nos cards
+        const elTotal = document.getElementById("metricTotalPatients");
+        const elUpi = document.getElementById("metricTotalUPI");
+        const elUti = document.getElementById("metricTotalUTI");
+        const elAlerts = document.getElementById("metricTotalBeersAlerts");
+        const elRate = document.getElementById("metricAcceptanceRate");
 
+        if (elTotal) elTotal.innerText = data.total_patients ?? 0;
+        if (elUpi) elUpi.innerText = data.count_upi ?? 0;
+        if (elUti) elUti.innerText = data.count_uti ?? 0;
+        if (elAlerts) elAlerts.innerText = data.total_beers_alerts ?? 0;
+        if (elRate) elRate.innerText = `${data.acceptance_rate ?? 0}%`;
+
+        // Atualiza a tabela do Top 5
         const tbody = document.getElementById("top5TableBody");
         if (tbody) {
           tbody.innerHTML = "";
@@ -827,17 +835,17 @@ function clearMetricsFilter() {
             data.top_5_beers.forEach(item => {
               tbody.innerHTML += `
                 <tr class="hover:bg-slate-50">
-                  <td class="py-2 px-1 font-bold text-slate-800">${item.drug}</td>
-                  <td class="py-2 px-1 text-right font-extrabold text-amber-600">${item.count}</td>
+                  <td class="py-2 px-2 font-bold text-slate-800">${item.drug}</td>
+                  <td class="py-2 px-2 text-right font-extrabold text-amber-600">${item.count}</td>
                 </tr>
               `;
             });
           } else {
-            tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado no período.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado.</td></tr>`;
           }
         }
-      } catch (e) {
-        console.error("Falha ao atualizar métricas:", e);
+      } catch (err) {
+        console.error("Erro ao carregar dados de indicadores:", err);
       }
     }
 
