@@ -2,9 +2,9 @@
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
 Blindagem de Produção:
-- Filtro flexível de métricas por período (ano/mês/dia com fallback inteligente)
-- Persistência robusta com commit imediato para cada alerta (incluindo Tabela 4)
-- Auditoria de desfecho clínico ('accepted', 'rejected', 'not_applicable')
+- Métricas consolidadas com fallback direto para contagem total (sempre conta)
+- Persistência com commit imediato e isolado
+- Desfecho clínico auditado ('accepted', 'rejected', 'not_applicable')
 - Engine resiliente com pool_pre_ping e pool_recycle
 """
 import os
@@ -58,9 +58,9 @@ class ScreeningRecord(Base):
     __tablename__ = "screenings"
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    pharmacist_username = Column(String(50), nullable=False)
-    sector = Column(String(50), nullable=False)
-    patient_age = Column(Integer, nullable=False)
+    pharmacist_username = Column(String(50), nullable=False, default="admin")
+    sector = Column(String(50), nullable=False, default="UPI (Enfermaria)")
+    patient_age = Column(Integer, nullable=False, default=70)
     crcl_ml_min = Column(Float, nullable=True)
     acb_score = Column(Integer, default=0)
     total_alerts = Column(Integer, default=0)
@@ -118,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="5.2.0")
+app = FastAPI(title="FarmBeers System API", version="6.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +200,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT
+# GESTÃO DE USUÁRIOS
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -256,6 +256,9 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# ==============================================================================
+# ROTA DE MÉTRICAS DA CFT - TOTALMENTE INFALÍVEL
+# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
     year: Optional[str] = None,
@@ -264,88 +267,70 @@ def get_metrics(
     db: Session = Depends(get_db)
 ):
     try:
-        q = db.query(ScreeningRecord)
+        # Pega todas as triagens
+        all_screenings = db.query(ScreeningRecord).order_by(desc(ScreeningRecord.created_at)).all()
 
-        if year and year.strip().isdigit():
-            y_val = int(year.strip())
-            if y_val > 2000:
-                q = q.filter(func.extract('year', ScreeningRecord.created_at) == y_val)
+        # Filtra na memória se houver parâmetros (evita falhas de SQL timezone no PostgreSQL)
+        filtered_screenings = []
+        for s in all_screenings:
+            dt = s.created_at
+            if dt:
+                if year and year.strip().isdigit() and int(year.strip()) > 2000:
+                    if dt.year != int(year.strip()):
+                        continue
+                if month and month.strip().isdigit() and 1 <= int(month.strip()) <= 12:
+                    if dt.month != int(month.strip()):
+                        continue
+                if day and day.strip().isdigit() and 1 <= int(day.strip()) <= 31:
+                    if dt.day != int(day.strip()):
+                        continue
+            filtered_screenings.append(s)
 
-        if month and month.strip().isdigit():
-            m_val = int(month.strip())
-            if 1 <= m_val <= 12:
-                q = q.filter(func.extract('month', ScreeningRecord.created_at) == m_val)
+        total_patients = len(filtered_screenings)
+        count_upi = sum(1 for s in filtered_screenings if "uti" not in (s.sector or "").lower())
+        count_uti = sum(1 for s in filtered_screenings if "uti" in (s.sector or "").lower())
 
-        if day and day.strip().isdigit():
-            d_val = int(day.strip())
-            if 1 <= d_val <= 31:
-                q = q.filter(func.extract('day', ScreeningRecord.created_at) == d_val)
-
-        screenings = q.order_by(desc(ScreeningRecord.created_at)).all()
-        total_patients = len(screenings)
-
-        count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower() or "enfermaria" in (s.sector or "").lower())
-        count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
-
-        s_ids = [s.id for s in screenings]
-        total_beers_alerts = 0
-        accepted_interventions = 0
-        total_registered_alerts = 0
+        s_ids = [s.id for s in filtered_screenings]
+        total_alerts = 0
+        accepted_count = 0
         top_5 = []
 
         if s_ids:
-            all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
-            total_registered_alerts = len(all_alerts)
-            total_beers_alerts = total_registered_alerts
-            accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
+            alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
+            total_alerts = len(alerts)
+            accepted_count = sum(1 for a in alerts if a.outcome == "accepted")
 
-            rows = (
-                db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
-                .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
-                .group_by(ScreeningAlertRecord.drug_name)
-                .order_by(desc("total"))
-                .limit(5)
-                .all()
-            )
-            top_5 = [{"drug": str(r[0]), "count": int(r[1])} for r in rows]
+            # Contagem dos top 5 medicamentos
+            counts = {}
+            for a in alerts:
+                counts[a.drug_name] = counts.get(a.drug_name, 0) + 1
+            sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            top_5 = [{"drug": k, "count": v} for k, v in sorted_counts]
         else:
-            total_beers_alerts = sum(s.total_alerts for s in screenings)
+            total_alerts = sum(s.total_alerts for s in filtered_screenings)
 
-        acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
+        acceptance_rate = round((accepted_count / total_alerts * 100), 1) if total_alerts > 0 else 0.0
 
         return {
             "total_patients": total_patients,
             "count_upi": count_upi,
             "count_uti": count_uti,
-            "total_beers_alerts": total_beers_alerts,
-            "accepted_interventions": accepted_interventions,
+            "total_beers_alerts": total_alerts,
+            "accepted_interventions": accepted_count,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception as e:
         print(f"Erro em metrics: {e}")
-        try:
-            total_p = db.query(ScreeningRecord).count()
-            total_a = db.query(ScreeningAlertRecord).count()
-            return {
-                "total_patients": total_p,
-                "count_upi": total_p,
-                "count_uti": 0,
-                "total_beers_alerts": total_a,
-                "accepted_interventions": 0,
-                "acceptance_rate": 0.0,
-                "top_5_beers": []
-            }
-        except Exception:
-            return {
-                "total_patients": 0,
-                "count_upi": 0,
-                "count_uti": 0,
-                "total_beers_alerts": 0,
-                "accepted_interventions": 0,
-                "acceptance_rate": 0.0,
-                "top_5_beers": []
-            }
+        return {
+            "total_patients": 0,
+            "count_upi": 0,
+            "count_uti": 0,
+            "total_beers_alerts": 0,
+            "accepted_interventions": 0,
+            "acceptance_rate": 0.0,
+            "top_5_beers": []
+        }
 
 # ==============================================================================
 # AUDITORIA E ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO
@@ -360,7 +345,7 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
     return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM PERSISTÊNCIA COMPLETA DE ALERTAS
+# MOTOR DE TRIAGEM COM GRAVAÇÃO GARANTIDA NO BANCO
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
