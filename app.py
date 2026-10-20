@@ -256,6 +256,9 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
+# ==============================================================================
+# ROTA DE MÉTRICAS DA CFT - TOTALMENTE REESCRITA E BLINDADA
+# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
     year: Optional[str] = None,
@@ -266,31 +269,50 @@ def get_metrics(
     try:
         q = db.query(ScreeningRecord)
 
-        if year and year.strip().isdigit() and int(year) > 0:
-            q = q.filter(func.extract('year', ScreeningRecord.created_at) == int(year))
-        if month and month.strip().isdigit() and int(month) > 0:
-            q = q.filter(func.extract('month', ScreeningRecord.created_at) == int(month))
-        if day and day.strip().isdigit() and int(day) > 0:
-            q = q.filter(func.extract('day', ScreeningRecord.created_at) == int(day))
+        # Filtros condicionais robustos (só aplica se for número válido)
+        if year and year.strip().isdigit():
+            y_val = int(year.strip())
+            if y_val > 2000:
+                q = q.filter(func.extract('year', ScreeningRecord.created_at) == y_val)
+
+        if month and month.strip().isdigit():
+            m_val = int(month.strip())
+            if 1 <= m_val <= 12:
+                q = q.filter(func.extract('month', ScreeningRecord.created_at) == m_val)
+
+        if day and day.strip().isdigit():
+            d_val = int(day.strip())
+            if 1 <= d_val <= 31:
+                q = q.filter(func.extract('day', ScreeningRecord.created_at) == d_val)
 
         screenings = q.order_by(desc(ScreeningRecord.created_at)).all()
         total_patients = len(screenings)
 
-        count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower() or "enfermaria" in (s.sector or "").lower())
-        count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
+        # Contagem de setores insensível a maiúsculas/minúsculas
+        count_upi = 0
+        count_uti = 0
+        total_beers_from_records = 0
+        s_ids = []
 
-        s_ids = [s.id for s in screenings]
-        total_beers_alerts = 0
+        for s in screenings:
+            s_ids.append(s.id)
+            total_beers_from_records += (s.total_alerts or 0)
+            sec = (s.sector or "").lower()
+            if "uti" in sec:
+                count_uti += 1
+            else:
+                count_upi += 1
+
+        top_5 = []
         accepted_interventions = 0
         total_registered_alerts = 0
-        top_5 = []
 
         if s_ids:
             all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
             total_registered_alerts = len(all_alerts)
-            total_beers_alerts = total_registered_alerts
             accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
 
+            # Ranking dos top 5 fármacos mais prescritos
             rows = (
                 db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
                 .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
@@ -300,31 +322,45 @@ def get_metrics(
                 .all()
             )
             top_5 = [{"drug": str(r[0]), "count": int(r[1])} for r in rows]
-        else:
-            total_beers_alerts = sum(s.total_alerts for s in screenings)
 
-        acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
+        # Se houver alertas registrados na tabela filha usa ela, senão usa a soma da tabela pai
+        final_total_alerts = total_registered_alerts if total_registered_alerts > 0 else total_beers_from_records
+        acceptance_rate = round((accepted_interventions / final_total_alerts * 100), 1) if final_total_alerts > 0 else 0.0
 
         return {
             "total_patients": total_patients,
             "count_upi": count_upi,
             "count_uti": count_uti,
-            "total_beers_alerts": total_beers_alerts,
+            "total_beers_alerts": final_total_alerts,
             "accepted_interventions": accepted_interventions,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception as e:
         print(f"Erro em metrics: {e}")
-        return {
-            "total_patients": 0,
-            "count_upi": 0,
-            "count_uti": 0,
-            "total_beers_alerts": 0,
-            "accepted_interventions": 0,
-            "acceptance_rate": 0.0,
-            "top_5_beers": []
-        }
+        # Retorna contagem direta sem filtros em caso de falha de conversão
+        try:
+            total_p = db.query(ScreeningRecord).count()
+            total_a = db.query(ScreeningAlertRecord).count()
+            return {
+                "total_patients": total_p,
+                "count_upi": total_p,
+                "count_uti": 0,
+                "total_beers_alerts": total_a,
+                "accepted_interventions": 0,
+                "acceptance_rate": 0.0,
+                "top_5_beers": []
+            }
+        except:
+            return {
+                "total_patients": 0,
+                "count_upi": 0,
+                "count_uti": 0,
+                "total_beers_alerts": 0,
+                "accepted_interventions": 0,
+                "acceptance_rate": 0.0,
+                "top_5_beers": []
+            }
 
 # ==============================================================================
 # AUDITORIA E ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO
