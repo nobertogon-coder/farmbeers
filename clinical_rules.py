@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers - Motor Clínico Oficial (AGS Beers Criteria 2023)
-Módulos:
+Módulos Integrados:
 - Tabela 2: Medicamentos Potencialmente Inapropriados em Idosos
 - Tabela 4: Interações Medicamentosas de Alto Risco em Idosos
-- Tabela 6: Medicamentos a Evitar ou Ajustar por Função Renal
+- Tabela 6: Medicamentos com Excreção Renal Crítica
 - Somador Quantitativo de Carga Anticolinérgica (ACB Score)
 - Modulação Posológica Hospitalar (Fixo vs. SN / QN / SOS)
 """
@@ -58,7 +58,7 @@ ACB_SCORE_MAP = {
 }
 
 # ==============================================================================
-# BASE DE REGRAS CLÍNICAS (AGS BEERS 2023 + DIRETRIZES CANADENSES)
+# BASE DE REGRAS CLÍNICAS (AGS BEERS 2023 + MODELO CANADENSE)
 # ==============================================================================
 BEERS_RULES = {
     "dexclorfeniramina": {
@@ -523,7 +523,7 @@ BEERS_RULES = {
 }
 
 # ==============================================================================
-# DICIONÁRIO DE SINÔNIMOS E FÁRMACOS AMPLIADO
+# DICIONÁRIO DE SINÔNIMOS AMPLIADO (NOMES COMERCIAIS BRASILEIROS)
 # ==============================================================================
 SYNONYM_MAP = {
     "dexclorfeniramina": "dexclorfeniramina",
@@ -642,7 +642,8 @@ SYNONYM_MAP = {
     "meperidina": "meperidina",
     "petidina": "meperidina",
     "dolantina": "meperidina",
-    # Mapeados para Interações da Tabela 4
+
+    # Fármacos adicionais mapeados para Interações da Tabela 4
     "losartana": "losartana",
     "enalapril": "enalapril",
     "captopril": "captopril",
