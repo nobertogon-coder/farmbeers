@@ -118,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="5.1.0")
+app = FastAPI(title="FarmBeers System API", version="5.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -256,9 +256,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "deleted"}
 
-# ==============================================================================
-# ROTA DE MÉTRICAS DA CFT - TOTALMENTE REESCRITA E BLINDADA
-# ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
     year: Optional[str] = None,
@@ -269,7 +266,6 @@ def get_metrics(
     try:
         q = db.query(ScreeningRecord)
 
-        # Filtros condicionais robustos (só aplica se for número válido)
         if year and year.strip().isdigit():
             y_val = int(year.strip())
             if y_val > 2000:
@@ -288,31 +284,21 @@ def get_metrics(
         screenings = q.order_by(desc(ScreeningRecord.created_at)).all()
         total_patients = len(screenings)
 
-        # Contagem de setores insensível a maiúsculas/minúsculas
-        count_upi = 0
-        count_uti = 0
-        total_beers_from_records = 0
-        s_ids = []
+        count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower() or "enfermaria" in (s.sector or "").lower())
+        count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
 
-        for s in screenings:
-            s_ids.append(s.id)
-            total_beers_from_records += (s.total_alerts or 0)
-            sec = (s.sector or "").lower()
-            if "uti" in sec:
-                count_uti += 1
-            else:
-                count_upi += 1
-
-        top_5 = []
+        s_ids = [s.id for s in screenings]
+        total_beers_alerts = 0
         accepted_interventions = 0
         total_registered_alerts = 0
+        top_5 = []
 
         if s_ids:
             all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
             total_registered_alerts = len(all_alerts)
+            total_beers_alerts = total_registered_alerts
             accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
 
-            # Ranking dos top 5 fármacos mais prescritos
             rows = (
                 db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
                 .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
@@ -322,23 +308,22 @@ def get_metrics(
                 .all()
             )
             top_5 = [{"drug": str(r[0]), "count": int(r[1])} for r in rows]
+        else:
+            total_beers_alerts = sum(s.total_alerts for s in screenings)
 
-        # Se houver alertas registrados na tabela filha usa ela, senão usa a soma da tabela pai
-        final_total_alerts = total_registered_alerts if total_registered_alerts > 0 else total_beers_from_records
-        acceptance_rate = round((accepted_interventions / final_total_alerts * 100), 1) if final_total_alerts > 0 else 0.0
+        acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
 
         return {
             "total_patients": total_patients,
             "count_upi": count_upi,
             "count_uti": count_uti,
-            "total_beers_alerts": final_total_alerts,
+            "total_beers_alerts": total_beers_alerts,
             "accepted_interventions": accepted_interventions,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception as e:
         print(f"Erro em metrics: {e}")
-        # Retorna contagem direta sem filtros em caso de falha de conversão
         try:
             total_p = db.query(ScreeningRecord).count()
             total_a = db.query(ScreeningAlertRecord).count()
@@ -351,7 +336,7 @@ def get_metrics(
                 "acceptance_rate": 0.0,
                 "top_5_beers": []
             }
-        except:
+        except Exception:
             return {
                 "total_patients": 0,
                 "count_upi": 0,
@@ -390,12 +375,12 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-   persisted_records = []
+    persisted_records = []
     if payload.medications:
         try:
             sec_val = str(payload.sector) if payload.sector else "UPI (Enfermaria)"
             crcl_val = float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None
-            
+
             record = ScreeningRecord(
                 pharmacist_username="admin",
                 sector=sec_val,
