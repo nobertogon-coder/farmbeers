@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Blindagem Técnica:
-- Engine do banco protegida com pool_pre_ping e pool_recycle para o Render
-- Compatibilidade estrita com a coluna de banco 'password' e hash seguro SHA-256
-- Auditoria e gravação instantânea de Aceitação Médica
-- Mapeamento cruzado da Tabela 4 na listagem de medicamentos
+Blindagem de Produção:
+- Engine com pool_pre_ping e pool_recycle (neutraliza timeouts no Render)
+- Coluna 'password' preservada com hash criptográfico SHA-256
+- Persistência com ID real para cada alerta (inclusive Tabela 4)
+- Auditoria de desfecho clínico ('accepted', 'rejected', 'not_applicable')
 """
 import os
 import io
@@ -73,7 +73,7 @@ class ScreeningAlertRecord(Base):
     drug_name = Column(String(150), nullable=False)
     axis = Column(String(100), nullable=False)
     recommendation = Column(String(1000), nullable=False)
-    outcome = Column(String(30), default="pending")  # 'accepted', 'rejected', 'pending'
+    outcome = Column(String(30), default="pending")  # 'accepted', 'rejected', 'not_applicable', 'pending'
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
@@ -118,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="4.5.0")
+app = FastAPI(title="FarmBeers System API", version="4.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -315,7 +315,7 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
     return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA E RETORNO SEGURO
+# MOTOR DE TRIAGEM COM PERSISTÊNCIA COMPLETA DE ALERTAS
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -400,7 +400,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         if is_sn_flag and "[SN/QN]" not in dose_route_str:
             dose_route_str = f"{dose_route_str} [SN/QN]"
 
-        # Prioriza a tag da Tabela 4 se o fármaco fizer parte de uma interação de alto risco
         tag_str = ""
         is_beers = False
 
