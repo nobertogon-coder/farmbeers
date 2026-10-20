@@ -2,10 +2,10 @@
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
 Blindagem de Produção:
-- Engine com pool_pre_ping e pool_recycle (neutraliza timeouts no Render)
-- Coluna 'password' preservada com hash criptográfico SHA-256
-- Persistência com ID real para cada alerta (inclusive Tabela 4)
+- Filtro flexível de métricas por período (ano/mês/dia com fallback inteligente)
+- Persistência robusta com ID garantido para cada alerta (incluindo Tabela 4)
 - Auditoria de desfecho clínico ('accepted', 'rejected', 'not_applicable')
+- Engine resiliente com pool_pre_ping e pool_recycle
 """
 import os
 import io
@@ -24,7 +24,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# CONFIGURAÇÃO DE BANCO DE DADOS POSTGRESQL (PERSISTENTE E BLINDADO)
+# BANCO DE DADOS POSTGRESQL (PERSISTENTE E BLINDADO)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -73,7 +73,7 @@ class ScreeningAlertRecord(Base):
     drug_name = Column(String(150), nullable=False)
     axis = Column(String(100), nullable=False)
     recommendation = Column(String(1000), nullable=False)
-    outcome = Column(String(30), default="pending")  # 'accepted', 'rejected', 'not_applicable', 'pending'
+    outcome = Column(String(30), default="pending")
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
@@ -118,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="4.8.0")
+app = FastAPI(title="FarmBeers System API", version="5.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -200,7 +200,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT
+# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT (FILTRAGEM CORRIGIDA)
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -257,25 +257,34 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 @app.get("/api/v1/admin/metrics")
-def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(ScreeningRecord).filter(func.extract('year', ScreeningRecord.created_at) == year)
-    if month:
+def get_metrics(year: Optional[int] = None, month: Optional[int] = None, day: Optional[int] = None, db: Session = Depends(get_db)):
+    q = db.query(ScreeningRecord)
+
+    # Aplica filtros de data apenas se fornecidos
+    if year and year > 0:
+        q = q.filter(func.extract('year', ScreeningRecord.created_at) == year)
+    if month and month > 0:
         q = q.filter(func.extract('month', ScreeningRecord.created_at) == month)
-    if day:
+    if day and day > 0:
         q = q.filter(func.extract('day', ScreeningRecord.created_at) == day)
 
     screenings = q.all()
     total_patients = len(screenings)
-    count_upi = sum(1 for s in screenings if s.sector == "UPI (Enfermaria)")
-    count_uti = sum(1 for s in screenings if s.sector == "UTI")
-    total_beers_alerts = sum(s.total_alerts for s in screenings)
+    count_upi = sum(1 for s in screenings if "upi" in (s.sector or "").lower())
+    count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
 
     s_ids = [s.id for s in screenings]
-    top_5 = []
+    total_beers_alerts = 0
     accepted_interventions = 0
     total_registered_alerts = 0
+    top_5 = []
 
     if s_ids:
+        all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
+        total_registered_alerts = len(all_alerts)
+        total_beers_alerts = total_registered_alerts
+        accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
+
         rows = (
             db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
             .filter(ScreeningAlertRecord.screening_id.in_(s_ids))
@@ -285,10 +294,9 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
             .all()
         )
         top_5 = [{"drug": r[0], "count": r[1]} for r in rows]
-
-        all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
-        total_registered_alerts = len(all_alerts)
-        accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
+    else:
+        # Se nenhum filtro encontrou, conta a soma dos screenings
+        total_beers_alerts = sum(s.total_alerts for s in screenings)
 
     acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
 
