@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Garante migração automática da coluna 'outcome' no PostgreSQL
+Blindagem Técnica:
+- Engine do banco protegida com pool_pre_ping e pool_recycle para o Render
+- Compatibilidade estrita com a coluna de banco 'password' e hash seguro SHA-256
+- Auditoria e gravação instantânea de Aceitação Médica
+- Mapeamento cruzado da Tabela 4 na listagem de medicamentos
 """
 import os
 import io
@@ -14,13 +18,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
 import clinical_rules
 
 # ==============================================================================
-# BANCO DE DADOS POSTGRESQL (COM AUTO-MIGRAÇÃO DE COLUNA)
+# CONFIGURAÇÃO DE BANCO DE DADOS POSTGRESQL (PERSISTENTE E BLINDADO)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -69,22 +73,10 @@ class ScreeningAlertRecord(Base):
     drug_name = Column(String(150), nullable=False)
     axis = Column(String(100), nullable=False)
     recommendation = Column(String(1000), nullable=False)
-    outcome = Column(String(30), default="pending")
+    outcome = Column(String(30), default="pending")  # 'accepted', 'rejected', 'pending'
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
-
-def run_db_migrations():
-    """Garante que a coluna 'outcome' e 'acb_score' existam no banco sem quebrar o deploy"""
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE screening_alerts ADD COLUMN IF NOT EXISTS outcome VARCHAR(30) DEFAULT 'pending';"))
-            conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS acb_score INTEGER DEFAULT 0;"))
-            conn.commit()
-        except Exception:
-            pass
-
-run_db_migrations()
 
 def get_db():
     db = SessionLocal()
@@ -124,9 +116,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI CONFIGURAÇÃO
+# FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="4.6.0")
+app = FastAPI(title="FarmBeers System API", version="4.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -208,7 +200,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# ADMINISTRAÇÃO E CFT
+# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -294,12 +286,9 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
         )
         top_5 = [{"drug": r[0], "count": r[1]} for r in rows]
 
-        try:
-            all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
-            total_registered_alerts = len(all_alerts)
-            accepted_interventions = sum(1 for a in all_alerts if getattr(a, "outcome", "") == "accepted")
-        except Exception:
-            accepted_interventions = 0
+        all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
+        total_registered_alerts = len(all_alerts)
+        accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
 
     acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
 
@@ -319,13 +308,14 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
     alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
-    if alert_rec:
-        alert_rec.outcome = payload.outcome
-        db.commit()
-    return {"status": "updated", "alert_id": alert_id, "outcome": payload.outcome}
+    if not alert_rec:
+        raise HTTPException(status_code=404, detail="Alerta não localizado.")
+    alert_rec.outcome = payload.outcome
+    db.commit()
+    return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM
+# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA E RETORNO SEGURO
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -340,7 +330,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-    persisted_ids = []
+    persisted_records = []
     if payload.medications:
         try:
             record = ScreeningRecord(
@@ -365,7 +355,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 )
                 db.add(alert_rec)
                 db.flush()
-                persisted_ids.append(alert_rec.id)
+                persisted_records.append(alert_rec.id)
             db.commit()
         except Exception:
             db.rollback()
@@ -373,10 +363,9 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     alerts_complete = []
     for idx, a in enumerate(alerts_raw):
         d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
-        # Garante sempre um ID (do banco ou sequencial)
-        alert_ident = persisted_ids[idx] if idx < len(persisted_ids) else (idx + 1)
+        db_id = persisted_records[idx] if idx < len(persisted_records) else None
         alerts_complete.append({
-            "id": alert_ident,
+            "id": db_id,
             "drug": d_name,
             "drug_name": d_name,
             "axis": a.get("axis", "AGS Beers 2023"),
@@ -411,6 +400,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         if is_sn_flag and "[SN/QN]" not in dose_route_str:
             dose_route_str = f"{dose_route_str} [SN/QN]"
 
+        # Prioriza a tag da Tabela 4 se o fármaco fizer parte de uma interação de alto risco
         tag_str = ""
         is_beers = False
 
@@ -524,6 +514,9 @@ async def extract_pdf(file: UploadFile = File(...)):
         "items": extracted_items
     }
 
+# ==============================================================================
+# CARREGAMENTO DO FRONTEND
+# ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     if os.path.exists("index.html"):
