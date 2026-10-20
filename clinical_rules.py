@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-FarmBeers - Motor Clínico Oficial (AGS Beers 2023)
-Integrado com:
-- Tabela 2 (Medicamentos a evitar em idosos)
-- Tabela 4 (Interações medicamentosas de alto risco AGS Beers 2023)
-- Tabela 6 (Ajuste por função renal)
-- Carga Anticolinérgica Cumulativa (ACB Score)
-- Modulação Posológica SN/QN/SOS
+FarmBeers - Motor Clínico Oficial (AGS Beers Criteria 2023)
+Módulos:
+- Tabela 2: Medicamentos Potencialmente Inapropriados em Idosos
+- Tabela 4: Interações Medicamentosas de Alto Risco em Idosos
+- Tabela 6: Medicamentos a Evitar ou Ajustar por Função Renal
+- Somador Quantitativo de Carga Anticolinérgica (ACB Score)
+- Modulação Posológica Hospitalar (Fixo vs. SN / QN / SOS)
 """
 import re
 import unicodedata
@@ -20,7 +20,11 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     return " ".join(text.split())
 
+# ==============================================================================
+# PONTUAÇÃO DE CARGA ANTICOLINÉRGICA (ACB SCORE)
+# ==============================================================================
 ACB_SCORE_MAP = {
+    # Nível 3 (Anticolinérgicos Severos)
     "dexclorfeniramina": 3,
     "hidroxizina": 3,
     "prometazina": 3,
@@ -35,8 +39,12 @@ ACB_SCORE_MAP = {
     "clorpromazina": 3,
     "levomepromazina": 3,
     "orfenadrina": 3,
+
+    # Nível 2 (Moderados)
     "ciclobenzaprina": 2,
     "carisoprodol": 2,
+
+    # Nível 1 (Baixa / Potencial)
     "diazepam": 1,
     "clonazepam": 1,
     "lorazepam": 1,
@@ -49,6 +57,9 @@ ACB_SCORE_MAP = {
     "clonidina": 1
 }
 
+# ==============================================================================
+# BASE DE REGRAS CLÍNICAS (AGS BEERS 2023 + DIRETRIZES CANADENSES)
+# ==============================================================================
 BEERS_RULES = {
     "dexclorfeniramina": {
         "drug": "Dexclorfeniramina",
@@ -217,9 +228,9 @@ BEERS_RULES = {
         "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar com ressalvas)",
         "renal_dependent": False,
         "recommendation": "Evitar o uso como controle comportamental não psicótico em idosos com demência.",
-        "rationale": "Risco aumentado de eventos cerebrovasculares, parkinsonismo secundário medicamentoso e mortalidade global em demência.",
-        "tapering": "Restringir apenas a delírio hiperativo grave com risco iminente de dano; descontinuar assim que estabilizado.",
-        "sos_note": "Se prescrito SN/QN para Delirium Hiperativo grave com agitação psicomotora: Administrar a menor dose (0,5 a 1mg) e monitorar intervalo QTc e sinais extrapiramidais."
+        "rationale": "Risco aumentado de eventos cerebrovasculares, parkinsonismo secundário e mortalidade global em demência.",
+        "tapering": "Restringir apenas a delírio hiperativo grave com risco de dano; descontinuar assim que estabilizado.",
+        "sos_note": "Se prescrito SN/QN para Delirium Hiperativo com agitação: Administrar menor dose (0,5 a 1mg) e monitorar QTc e sinais extrapiramidais."
     },
     "clorpromazina": {
         "drug": "Clorpromazina",
@@ -228,7 +239,7 @@ BEERS_RULES = {
         "recommendation": "Evitar em geriatria.",
         "rationale": "Sedação severa, bloqueio alfa-1 com síncope postural e propriedades anticolinérgicas intensas.",
         "tapering": "Desmame progressivo sob avaliação psiquiátrica.",
-        "sos_note": "Alto risco de precipitar hipotensão ortostática fulminante ao ser administrado como dose de resgate."
+        "sos_note": "Alto risco de precipitar hipotensão ortostática fulminante ao ser administrado como resgate."
     },
     "levomepromazina": {
         "drug": "Levomepromazina",
@@ -273,14 +284,14 @@ BEERS_RULES = {
         "recommendation": "Evitar o uso crônico ou profilático desnecessário.",
         "rationale": "Antagonismo D2 central. Causa discinesia tardia frequentemente irreversível, acatisia e parkinsonismo medicamentoso.",
         "tapering": "Substituir por Ondansetrona ou Domperidona por curto período com monitoramento eletrocardiográfico.",
-        "sos_note": "Uso SN/QN para náuseas agudas: Preferir ondansetrona; se administrada, não exceder 12 semanas cumulativas e vigiar sintomas extrapiramidais."
+        "sos_note": "Uso SN/QN para náuseas agudas: Preferir ondansetrona; se administrada, não exceder 12 semanas e vigiar sinais extrapiramidais."
     },
     "omeprazol": {
         "drug": "Omeprazol",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso > 8 semanas)",
         "renal_dependent": False,
         "recommendation": "Evitar uso contínuo por mais de 8 semanas sem indicação clínica formal.",
-        "rationale": "O bloqueio ácido crônico favorece infecção por Clostridioides difficile, desmineralização óssea com fraturas, hipomagnesemia e má absorção de B12.",
+        "rationale": "O bloqueio ácido crônico favorece infecção por C. difficile, desmineralização óssea com fraturas, hipomagnesemia e má absorção de B12.",
         "tapering": "Reduzir para dose em dias alternados por 2 semanas antes da suspensão, associando antiácidos se houver pirose de rebote.",
         "sos_note": "Em caso de queimação episódica, preferir antiácidos tópicos pontuais a iniciar IBP contínuo."
     },
@@ -511,6 +522,9 @@ BEERS_RULES = {
     }
 }
 
+# ==============================================================================
+# DICIONÁRIO DE SINÔNIMOS E FÁRMACOS AMPLIADO
+# ==============================================================================
 SYNONYM_MAP = {
     "dexclorfeniramina": "dexclorfeniramina",
     "maleato de dexclorfeniramina": "dexclorfeniramina",
@@ -628,8 +642,7 @@ SYNONYM_MAP = {
     "meperidina": "meperidina",
     "petidina": "meperidina",
     "dolantina": "meperidina",
-
-    # Fármacos adicionais mapeados para Interações da Tabela 4
+    # Mapeados para Interações da Tabela 4
     "losartana": "losartana",
     "enalapril": "enalapril",
     "captopril": "captopril",
@@ -673,8 +686,9 @@ def identify_drug_canonical(input_text: str) -> Optional[str]:
 # ==============================================================================
 # DETECTOR DA TABELA 4 DE BEERS (INTERAÇÕES MEDICAMENTOSAS DE ALTO RISCO)
 # ==============================================================================
-def check_beers_table_4_interactions(active_canonicals: List[str]) -> List[Dict[str, Any]]:
+def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     table_4_alerts = []
+    med_tag_map = {}
     meds = set(active_canonicals)
 
     opioids = {"tramadol", "codeina", "morfina", "meperidina"}
@@ -688,12 +702,14 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> List[Dict[
     found_op = meds.intersection(opioids)
     found_bzd = meds.intersection(bzds_and_z)
     if found_op and found_bzd:
+        for m in found_op.union(found_bzd):
+            med_tag_map[m] = "Tabela 4: Interação Opioide + BZD"
         table_4_alerts.append({
             "drug": f"{', '.join([o.capitalize() for o in found_op])} + {', '.join([b.capitalize() for b in found_bzd])}",
             "drug_name": "Associação Opioide + Benzodiazepínico/Z",
             "axis": "AGS Beers 2023 - Tabela 4 (Interação Crítica)",
             "recommendation": "Evitar uso concomitante. Alto risco de sedação sinérgica grave, depressão respiratória fatal e coma.",
-            "rationale": "A FDA e a AGS Beers contraindicam a prescrição combinada rotineira em idosos devido à potencialização letal no SNC.",
+            "rationale": "A FDA e a AGS Beers contraindicam a prescrição combinada rotineira em idosos devido à potencialização tóxica no SNC.",
             "tapering": "Se a analgesia for necessária, priorizar analgésicos não opioides e iniciar desmame gradual do sedativo.",
             "is_sos": False,
             "acb_score": 0
@@ -702,13 +718,16 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> List[Dict[
     # Interação 2: IECA/BRA + Espironolactona
     found_ras = meds.intersection(ras_inhibitors)
     if found_ras and "espironolactona" in meds:
+        for m in found_ras:
+            med_tag_map[m] = "Tabela 4: IECA/BRA + Espironolactona"
+        med_tag_map["espironolactona"] = "Tabela 4: IECA/BRA + Espironolactona"
         table_4_alerts.append({
             "drug": f"{', '.join([r.capitalize() for r in found_ras])} + Espironolactona",
             "drug_name": "Associação IECA/BRA + Espironolactona",
             "axis": "AGS Beers 2023 - Tabela 4 (Interação Crítica)",
             "recommendation": "Monitorar rigorosamente potássio sérico e função renal. Evitar doses de espironolactona > 25mg/dia.",
-            "rationale": "Bloqueio duplo do sistema renina-angiotensina-aldosterona gerando hipercalemia grave e arritmias cardíacas em idosos.",
-            "tapering": "Avaliar dosagem de eletrólitos a cada 48h no internamento; suspender se K+ > 5,0 mEq/L.",
+            "rationale": "Bloqueio duplo do sistema renina-angiotensina-aldosterona gerando hipercalemia grave e arritmias em idosos.",
+            "tapering": "Avaliar dosagem de eletrólitos a cada 48h; suspender se K+ > 5,0 mEq/L.",
             "is_sos": False,
             "acb_score": 0
         })
@@ -717,6 +736,8 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> List[Dict[
     found_anticoag = meds.intersection(anticoagulants)
     found_nsaid = meds.intersection(nsaids)
     if found_anticoag and found_nsaid:
+        for m in found_anticoag.union(found_nsaid):
+            med_tag_map[m] = "Tabela 4: Anticoagulante + AINE"
         table_4_alerts.append({
             "drug": f"{', '.join([a.capitalize() for a in found_anticoag])} + {', '.join([n.capitalize() for n in found_nsaid])}",
             "drug_name": "Associação Anticoagulante + AINE",
@@ -731,18 +752,21 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> List[Dict[
     # Interação 4: 3 ou mais agentes ativos no SNC (Polifarmácia Psicotrópica)
     found_cns = meds.intersection(cns_drugs)
     if len(found_cns) >= 3:
+        for m in found_cns:
+            if m not in med_tag_map:
+                med_tag_map[m] = "Tabela 4: Polifarmácia SNC (≥3 fármacos)"
         table_4_alerts.append({
             "drug": f"Polifarmácia SNC ({', '.join([c.capitalize() for c in found_cns])})",
             "drug_name": "Associação de ≥ 3 Medicamentos do SNC",
             "axis": "AGS Beers 2023 - Tabela 4 (Risco Extremo de Quedas)",
             "recommendation": "Reduzir o número total de fármacos que atuam no SNC. Minimizar doses e evitar duplicidades terapêuticas.",
-            "rationale": "Uso de 3 ou mais agentes psicoativos eleva substancialmente o risco de fraturas por quedas, ataxia e declínio cognitivo agudo.",
+            "rationale": "Uso de 3 ou mais agentes psicoativos eleva substancialmente o risco de fraturas por quedas, ataxia e confusão mental.",
             "tapering": "Eleger o medicamento com menor indicação clínica para iniciar desmame (*tapering*) escalonado.",
             "is_sos": False,
             "acb_score": 0
         })
 
-    return table_4_alerts
+    return table_4_alerts, med_tag_map
 
 # ==============================================================================
 # MOTOR CONSOLIDADO DE AVALIAÇÃO DE BEERS 2023
@@ -753,13 +777,13 @@ def evaluate_patient_beers(
     fall_risk: bool = False,
     conditions: Optional[List[str]] = None,
     crcl: Optional[float] = None
-) -> Tuple[List[Dict[str, Any]], int, str]:
+) -> Tuple[List[Dict[str, Any]], int, str, Dict[str, str]]:
     alerts = []
     conditions = conditions or []
     total_acb_score = 0
 
     if age < 65:
-        return alerts, 0, "Idade inferior a 65 anos. Avaliação de Beers não aplicável por critério etário."
+        return alerts, 0, "Idade inferior a 65 anos. Avaliação de Beers não aplicável por critério etário.", {}
 
     processed = set()
     canonicals_list = []
@@ -820,8 +844,7 @@ def evaluate_patient_beers(
                 "acb_score": acb_pts
             })
 
-    # Adiciona as Interações de Alto Risco da Tabela 4
-    table_4_alerts = check_beers_table_4_interactions(canonicals_list)
+    table_4_alerts, med_tag_map = check_beers_table_4_interactions(canonicals_list)
     alerts.extend(table_4_alerts)
 
     if total_acb_score >= 3:
@@ -831,4 +854,4 @@ def evaluate_patient_beers(
     else:
         acb_interpretation = "Carga Anticolinérgica Neutra (0 pontos) — Sem medicamentos anticolinérgicos identificados."
 
-    return alerts, total_acb_score, acb_interpretation
+    return alerts, total_acb_score, acb_interpretation, med_tag_map
