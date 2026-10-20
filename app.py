@@ -2,10 +2,10 @@
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
 Com:
-- Engine blindada para Render (pool_pre_ping e pool_recycle)
+- Registro de desfecho clínico (Aceitação Médica) para métricas científicas
+- Pool de conexão blindado contra desconexões no Render
 - Compatibilidade estrita com a coluna 'password' existente
-- Extração inteligente de PDF por regex (Dose, Via e SN/QN)
-- Suporte completo ao Escore Anticolinérgico (ACB Score)
+- Extração inteligente de PDF via Regex
 """
 import os
 import io
@@ -24,7 +24,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# CONFIGURAÇÃO DE BANCO DE DADOS BLINDADA CONTRA DESCONEXÕES
+# CONFIGURAÇÃO DE BANCO DE DADOS POSTGRESQL (PERSISTENTE E BLINDADO)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -32,7 +32,6 @@ if DATABASE_URL.startswith("postgres://"):
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-# pool_pre_ping testa a conexão antes de executar queries e pool_recycle evita conexões mortas no Render
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
@@ -50,7 +49,6 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    # Mantém o nome 'password' para preservar a estrutura da tabela criada no PostgreSQL
     password = Column(String(100), nullable=False)
     role = Column(String(20), default="pharmacist")
     is_active = Column(Boolean, default=True)
@@ -64,6 +62,7 @@ class ScreeningRecord(Base):
     sector = Column(String(50), nullable=False)
     patient_age = Column(Integer, nullable=False)
     crcl_ml_min = Column(Float, nullable=True)
+    acb_score = Column(Integer, default=0)
     total_alerts = Column(Integer, default=0)
     alerts = relationship("ScreeningAlertRecord", back_populates="screening", cascade="all, delete-orphan")
 
@@ -71,9 +70,11 @@ class ScreeningAlertRecord(Base):
     __tablename__ = "screening_alerts"
     id = Column(Integer, primary_key=True, index=True)
     screening_id = Column(Integer, ForeignKey("screenings.id"))
-    drug_name = Column(String(100), nullable=False)
+    drug_name = Column(String(150), nullable=False)
     axis = Column(String(100), nullable=False)
     recommendation = Column(String(1000), nullable=False)
+    # Status da intervenção: 'pending', 'accepted', 'rejected'
+    outcome = Column(String(30), default="pending")
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
@@ -118,7 +119,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="3.8.0")
+app = FastAPI(title="FarmBeers System API", version="4.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -140,6 +141,9 @@ class CreateUserRequest(BaseModel):
     password: str
     role: str
 
+class OutcomeRequest(BaseModel):
+    outcome: str  # 'accepted', 'rejected', 'pending'
+
 class MedicationInput(BaseModel):
     name: str
     dose: Optional[str] = ""
@@ -157,7 +161,7 @@ class ScreeningPayload(BaseModel):
     medications: List[MedicationInput] = []
 
 # ==============================================================================
-# AUTENTICAÇÃO COM HASH CRIPTOGRÁFICO
+# AUTENTICAÇÃO
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
@@ -197,7 +201,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# ADMINISTRAÇÃO E CFT
+# GESTÃO DE USUÁRIOS E MÉTRICAS DA CFT
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -269,6 +273,9 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
 
     s_ids = [s.id for s in screenings]
     top_5 = []
+    accepted_interventions = 0
+    total_registered_alerts = 0
+
     if s_ids:
         rows = (
             db.query(ScreeningAlertRecord.drug_name, func.count(ScreeningAlertRecord.id).label("total"))
@@ -280,16 +287,36 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
         )
         top_5 = [{"drug": r[0], "count": r[1]} for r in rows]
 
+        all_alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
+        total_registered_alerts = len(all_alerts)
+        accepted_interventions = sum(1 for a in all_alerts if a.outcome == "accepted")
+
+    acceptance_rate = round((accepted_interventions / total_registered_alerts * 100), 1) if total_registered_alerts > 0 else 0.0
+
     return {
         "total_patients": total_patients,
         "count_upi": count_upi,
         "count_uti": count_uti,
         "total_beers_alerts": total_beers_alerts,
+        "accepted_interventions": accepted_interventions,
+        "acceptance_rate": acceptance_rate,
         "top_5_beers": top_5
     }
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA (ACB SCORE)
+# ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO FARMACÊUTICA
+# ==============================================================================
+@app.patch("/api/v1/alerts/{alert_id}/outcome")
+def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
+    alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
+    if not alert_rec:
+        raise HTTPException(status_code=404, detail="Alerta não localizado.")
+    alert_rec.outcome = payload.outcome
+    db.commit()
+    return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
+
+# ==============================================================================
+# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA E PERSISTÊNCIA DE ID
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -304,10 +331,42 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
+    persisted_records = []
+    if payload.medications:
+        try:
+            record = ScreeningRecord(
+                pharmacist_username="admin",
+                sector=payload.sector or "UPI (Enfermaria)",
+                patient_age=patient_age,
+                crcl_ml_min=payload.crcl_ml_min,
+                acb_score=acb_total,
+                total_alerts=len(alerts_raw)
+            )
+            db.add(record)
+            db.flush()
+
+            for a in alerts_raw:
+                d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
+                alert_rec = ScreeningAlertRecord(
+                    screening_id=record.id,
+                    drug_name=d_name,
+                    axis=a.get("axis", "AGS Beers 2023"),
+                    recommendation=a.get("recommendation", "Reavaliar prescrição."),
+                    outcome="pending"
+                )
+                db.add(alert_rec)
+                db.flush()
+                persisted_records.append(alert_rec.id)
+            db.commit()
+        except Exception:
+            db.rollback()
+
     alerts_complete = []
-    for a in alerts_raw:
+    for idx, a in enumerate(alerts_raw):
         d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
+        db_id = persisted_records[idx] if idx < len(persisted_records) else None
         alerts_complete.append({
+            "id": db_id,
             "drug": d_name,
             "drug_name": d_name,
             "axis": a.get("axis", "AGS Beers 2023"),
@@ -315,7 +374,8 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
             "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
             "tapering": a.get("tapering", ""),
             "is_sos": a.get("is_sos", False),
-            "acb_score": a.get("acb_score", 0)
+            "acb_score": a.get("acb_score", 0),
+            "outcome": "pending"
         })
 
     alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
@@ -357,30 +417,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 "is_sos": is_sn_flag,
                 "alert_tag": ""
             })
-
-    if payload.medications:
-        try:
-            record = ScreeningRecord(
-                pharmacist_username="admin",
-                sector=payload.sector or "UPI (Enfermaria)",
-                patient_age=patient_age,
-                crcl_ml_min=payload.crcl_ml_min,
-                total_alerts=len(alerts_complete)
-            )
-            db.add(record)
-            db.flush()
-
-            for a in alerts_complete:
-                alert_rec = ScreeningAlertRecord(
-                    screening_id=record.id,
-                    drug_name=a["drug"],
-                    axis=a["axis"],
-                    recommendation=a["recommendation"]
-                )
-                db.add(alert_rec)
-            db.commit()
-        except Exception:
-            db.rollback()
 
     return {
         "total_beers_alerts": len(alerts_complete),
@@ -478,7 +514,7 @@ async def extract_pdf(file: UploadFile = File(...)):
     }
 
 # ==============================================================================
-# CARREGAMENTO DA INTERFACE WEB
+# CARREGAMENTO DA PÁGINA
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
