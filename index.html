@@ -99,7 +99,7 @@
         <div class="border-b border-slate-200 pb-3">
           <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">1. Objetivo e Âmbito Clínico</h4>
           <p>
-            O <strong>FarmBeers</strong> é uma ferramenta de suporte à decisão clínica baseada nas diretrizes da <em>American Geriatrics Society</em> (AGS Beers Criteria 2023), aplicada aos princípios ativos hospitalares brasileiros para prevenção de eventos adversos e morbimortalidade geriátrica.
+            O <strong>FarmBeers</strong> é uma ferramenta de suporte à decisão clínica baseada nas diretrizes da <em>American Geriatrics Society</em> (AGS Beers Criteria 2023), aplicada aos medicamentos hospitalares brasileiros para prevenção de eventos adversos e morbimortalidade geriátrica.
           </p>
         </div>
 
@@ -118,12 +118,12 @@
         </div>
 
         <div class="border-b border-slate-200 pb-3">
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">4. Classes Críticas e Medicamentos a Evitar (Tabela 2)</h4>
+          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">4. Classes Críticas e Medicamentos a Evitar (Tabela 2 e Tabela 4)</h4>
           <ul class="list-disc pl-4 space-y-1 mt-1 text-slate-600">
             <li><strong>Anti-histamínicos de 1ª Geração (Dexclorfeniramina, Hidroxizina, Prometazina):</strong> Potente ação anticolinérgica. Alto risco de sedação, boca seca, constipação severa, retenção urinária e delirium. Preferir anti-histamínicos de 2ª geração ou controle tópico nasal.</li>
             <li><strong>Benzodiazepínicos e Hipnóticos Z (Diazepam, Clonazepam, Zolpidem):</strong> Risco elevado de quedas, fraturas e confusão mental aguda. Exigem plano de desprescrição gradual (*tapering*).</li>
+            <li><strong>Interações de Alto Risco (Tabela 4):</strong> Associações Opioide + Benzodiazepínico/Z, Anticoagulante + AINE e IECA/BRA + Espironolactona geram alertas específicos de potencial letalidade.</li>
             <li><strong>AINEs Sistêmicos (Diclofenaco, Cetoprofeno, Ibuprofeno):</strong> Alto risco de sangramento gastrointestinal e injúria renal aguda.</li>
-            <li><strong>Antieméticos Antidopaminérgicos (Metoclopramida):</strong> Risco de discinesia tardia extrapiramidal irreversível.</li>
           </ul>
         </div>
 
@@ -213,9 +213,9 @@
       <div class="flex justify-between items-center border-b pb-3">
         <div>
           <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-            <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-600"></i> Indicadores Clínicos de Beers
+            <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-600"></i> Indicadores Clínicos de Beers & CFT
           </h3>
-          <p class="text-xs text-slate-500">Métricas consolidadas de prescrições inadequadas para auditoria e CFT</p>
+          <p class="text-xs text-slate-500">Métricas consolidadas de intervenção e taxa de aceitação médica para pesquisa</p>
         </div>
         <button onclick="toggleMetricsModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
@@ -244,18 +244,22 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div class="bg-cyan-50/70 p-3.5 rounded-lg border border-cyan-200 text-center">
-          <span class="text-[10px] font-bold text-cyan-800 uppercase tracking-wider block">Total Geral de Pacientes</span>
-          <strong id="metricTotalPatients" class="text-2xl font-extrabold text-[#0b2447] mt-1 block">0</strong>
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+        <div class="bg-cyan-50/70 p-3 rounded-lg border border-cyan-200 text-center">
+          <span class="text-[9px] font-bold text-cyan-800 uppercase tracking-wider block">Total Pacientes</span>
+          <strong id="metricTotalPatients" class="text-xl font-extrabold text-[#0b2447] mt-0.5 block">0</strong>
         </div>
-        <div class="bg-emerald-50/70 p-3.5 rounded-lg border border-emerald-200 text-center">
-          <span class="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
-          <strong id="metricTotalUPI" class="text-2xl font-extrabold text-emerald-700 mt-1 block">0</strong>
+        <div class="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 text-center">
+          <span class="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
+          <strong id="metricTotalUPI" class="text-xl font-extrabold text-emerald-700 mt-0.5 block">0</strong>
         </div>
-        <div class="bg-indigo-50/70 p-3.5 rounded-lg border border-indigo-200 text-center">
-          <span class="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
-          <strong id="metricTotalUTI" class="text-2xl font-extrabold text-indigo-700 mt-1 block">0</strong>
+        <div class="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 text-center">
+          <span class="text-[9px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
+          <strong id="metricTotalUTI" class="text-xl font-extrabold text-indigo-700 mt-0.5 block">0</strong>
+        </div>
+        <div class="bg-emerald-100/70 p-3 rounded-lg border border-emerald-300 text-center">
+          <span class="text-[9px] font-bold text-emerald-900 uppercase tracking-wider block">Aceitação Médica</span>
+          <strong id="metricAcceptanceRate" class="text-xl font-extrabold text-emerald-800 mt-0.5 block">0.0%</strong>
         </div>
       </div>
 
@@ -518,7 +522,7 @@
 
     </div>
 
-    <!-- PARECER GERADO COM CARGA ANTICOLINÉRGICA (ACB SCORE) -->
+    <!-- PARECER GERADO COM REGISTRO DE DESFECHO CLÍNICO -->
     <div id="screeningReportBox" class="hidden bg-white rounded-lg p-5 border border-slate-200 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
         <div>
@@ -540,7 +544,7 @@
         </div>
       </div>
 
-      <!-- CARD DE TOPO: CARGA ANTICOLINÉRGICA TOTAL (ACB SCORE) -->
+      <!-- CARD DE TOPO: CARGA ANTICOLINÉRGICA (ACB SCORE) -->
       <div id="boxAcbSummary" class="p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-3">
         <div class="p-2 bg-purple-100 text-purple-700 rounded font-bold text-xs uppercase flex items-center gap-1">
           <i data-lucide="brain" class="w-4 h-4"></i>
@@ -778,6 +782,7 @@
         document.getElementById("metricTotalUPI").innerText = data.count_upi;
         document.getElementById("metricTotalUTI").innerText = data.count_uti;
         document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts;
+        document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate || 0}%`;
 
         const tbody = document.getElementById("top5TableBody");
         tbody.innerHTML = "";
@@ -792,7 +797,7 @@
             `;
           });
         } else {
-          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum medicamento inapropriado registrado para este período.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum medicamento registrado para este período.</td></tr>`;
         }
       } catch (e) {
         console.error("Erro ao carregar indicadores.");
@@ -1081,7 +1086,6 @@
       saveState();
     }
 
-    // Processamento Seguro da Triagem com Trava Anti-Duplo Clique
     async function processCompleteScreening() {
       if (medicationsList.length === 0) {
         alert("Insira ao menos um medicamento para avaliar.");
@@ -1124,7 +1128,6 @@
         const list = document.getElementById("reportAlertsList");
         const badge = document.getElementById("reportBadgeSummary");
 
-        // Carga Anticolinérgica (ACB Score)
         const acbScore = data.acb_score || 0;
         const acbInterp = data.acb_interpretation || "Neutro";
         lastAcbSummary = `${acbScore} pontos (${acbInterp})`;
@@ -1143,13 +1146,14 @@
           `;
         } else {
           let alertsHtml = "";
-          lastGeneratedAlerts.forEach(a => {
+          lastGeneratedAlerts.forEach((a, i) => {
             const drugName = a.drug || a.drug_name || "Medicamento";
             const axisName = a.axis || "AGS Beers 2023";
             const recText = a.recommendation || "Reavaliar uso em idosos.";
             const ratText = a.rationale || "Medicamento potencialmente inapropriado pela diretriz AGS Beers.";
             const isSn = a.is_sos || false;
             const acbPts = a.acb_score || 0;
+            const alertId = a.id || null;
             
             const snTag = isSn ? '<span class="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded ml-2">Regime: SN / QN</span>' : '';
             const acbTag = acbPts > 0 ? `<span class="bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-bold px-2 py-0.5 rounded ml-1">ACB: +${acbPts}</span>` : '';
@@ -1163,6 +1167,23 @@
                  </div>`
               : '';
 
+            // Botões de Desfecho da Intervenção
+            const outcomeButtons = alertId ? `
+              <div class="mt-2.5 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[10px] font-bold uppercase text-slate-500">Desfecho com a Equipe Médica:</span>
+                <div class="flex items-center gap-1.5" id="outcomeContainer_${alertId}">
+                  <button type="button" onclick="setAlertOutcome(${alertId}, 'accepted')" 
+                    class="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded text-[10px] font-bold flex items-center gap-1">
+                    ✓ Aceita pelo Médico
+                  </button>
+                  <button type="button" onclick="setAlertOutcome(${alertId}, 'rejected')" 
+                    class="px-2 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 rounded text-[10px] font-bold flex items-center gap-1">
+                    ✗ Recusada c/ Justificativa
+                  </button>
+                </div>
+              </div>
+            ` : '';
+
             alertsHtml += `
               <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 shadow-sm">
                 <div class="flex justify-between items-center font-bold">
@@ -1174,6 +1195,7 @@
                 <div class="text-slate-800"><strong>Conduta Recomendada:</strong> ${recText}</div>
                 <div class="text-slate-600 bg-white p-2 rounded border border-slate-100"><strong>Racional Clínico:</strong> ${ratText}</div>
                 ${taperingHtml}
+                ${outcomeButtons}
               </div>
             `;
           });
@@ -1196,7 +1218,26 @@
       }
     }
 
-    // Exportação em formato SOAP para prontuário (MV / Tasy)
+    async function setAlertOutcome(alertId, outcome) {
+      const container = document.getElementById(`outcomeContainer_${alertId}`);
+      try {
+        const res = await fetch(`/api/v1/alerts/${alertId}/outcome`, {
+          method: "PATCH",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ outcome })
+        });
+        if (!res.ok) throw new Error("Falha ao registrar");
+
+        if (outcome === "accepted") {
+          container.innerHTML = `<span class="bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">✓ Intervenção Aceita e Registrada</span>`;
+        } else {
+          container.innerHTML = `<span class="bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">✗ Recusa Registrada em Auditoria</span>`;
+        }
+      } catch (e) {
+        alert("Erro ao salvar desfecho no banco de dados.");
+      }
+    }
+
     function copySoapNote() {
       if (lastGeneratedAlerts.length === 0) {
         alert("Nenhum alerta pendente para exportação.");
