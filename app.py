@@ -390,14 +390,17 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         crcl=payload.crcl_ml_min
     )
 
-    persisted_records = []
+   persisted_records = []
     if payload.medications:
         try:
+            sec_val = str(payload.sector) if payload.sector else "UPI (Enfermaria)"
+            crcl_val = float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None
+            
             record = ScreeningRecord(
                 pharmacist_username="admin",
-                sector=str(payload.sector or "UPI (Enfermaria)"),
+                sector=sec_val,
                 patient_age=int(patient_age),
-                crcl_ml_min=float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None,
+                crcl_ml_min=crcl_val,
                 acb_score=int(acb_total),
                 total_alerts=len(alerts_raw)
             )
