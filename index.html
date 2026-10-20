@@ -522,7 +522,7 @@
 
     </div>
 
-    <!-- PARECER GERADO COM REGISTRO DE DESFECHO CLÍNICO -->
+    <!-- PARECER GERADO COM REGISTRO DE AUDITORIA E DESFECHO -->
     <div id="screeningReportBox" class="hidden bg-white rounded-lg p-5 border border-slate-200 shadow-sm space-y-4">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
         <div>
@@ -1086,6 +1086,7 @@
       saveState();
     }
 
+    // Processamento Seguro da Triagem com Trava Anti-Duplo Clique
     async function processCompleteScreening() {
       if (medicationsList.length === 0) {
         alert("Insira ao menos um medicamento para avaliar.");
@@ -1167,7 +1168,6 @@
                  </div>`
               : '';
 
-            // Botões de Desfecho da Intervenção
             const outcomeButtons = alertId ? `
               <div class="mt-2.5 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
                 <span class="text-[10px] font-bold uppercase text-slate-500">Desfecho com a Equipe Médica:</span>
