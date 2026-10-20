@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-FarmBeers - Motor Clínico Oficial (AGS Beers Criteria 2023)
-Módulos Integrados:
-- Tabela 2: Medicamentos Potencialmente Inapropriados em Idosos
+FarmBeers - Motor Clínico Oficial e Base Integral de Regras (AGS Beers Criteria 2023)
+Módulos:
+- Tabela 2: Medicamentos a Evitar na População Geriátrica Geral
 - Tabela 4: Interações Medicamentosas de Alto Risco em Idosos
-- Tabela 6: Medicamentos com Excreção Renal Crítica
+- Tabela 6: Medicamentos a Evitar ou Ajustar por Função Renal (Cockcroft-Gault)
 - Somador Quantitativo de Carga Anticolinérgica (ACB Score)
 - Modulação Posológica Hospitalar (Fixo vs. SN / QN / SOS)
+- Recomendações Práticas de Desprescrição (Tapering / Rede Canadense)
 """
 import re
 import unicodedata
@@ -21,38 +22,64 @@ def normalize_text(text: str) -> str:
     return " ".join(text.split())
 
 # ==============================================================================
-# PONTUAÇÃO DE CARGA ANTICOLINÉRGICA (ACB SCORE)
+# SOMADOR DE CARGA ANTICOLINÉRGICA (ACB SCORE)
+# 3 = Ação Severa | 2 = Ação Moderada | 1 = Ação Fraca/Potencial
 # ==============================================================================
 ACB_SCORE_MAP = {
+    # Nível 3 (Anticolinérgicos de Alta Potência)
     "dexclorfeniramina": 3,
     "hidroxizina": 3,
     "prometazina": 3,
     "dimenidrinato": 3,
     "difenidramina": 3,
     "escopolamina": 3,
+    "atropina": 3,
     "biperideno": 3,
+    "triexifenidil": 3,
     "oxibutinina": 3,
+    "tolterodina": 3,
+    "solifenacina": 3,
     "amitriptilina": 3,
-    "clomipramina": 3,
     "nortriptilina": 3,
+    "clomipramina": 3,
+    "imipramina": 3,
+    "doxepina": 3,
     "clorpromazina": 3,
     "levomepromazina": 3,
+    "tioridazina": 3,
     "orfenadrina": 3,
+
+    # Nível 2 (Potência Moderada)
     "ciclobenzaprina": 2,
     "carisoprodol": 2,
+    "baclofeno": 2,
+    "tizanidina": 2,
+
+    # Nível 1 (Potência Leve / Carga Aditiva)
     "diazepam": 1,
     "clonazepam": 1,
     "lorazepam": 1,
     "alprazolam": 1,
+    "bromazepam": 1,
+    "midazolam": 1,
     "haloperidol": 1,
     "risperidona": 1,
     "quetiapina": 1,
     "olanzapina": 1,
+    "aripiprazol": 1,
     "metoclopramida": 1,
-    "clonidina": 1
+    "domperidona": 1,
+    "clonidina": 1,
+    "cimetidina": 1,
+    "ranitidina": 1,
+    "paroxetina": 1
 }
 
+# ==============================================================================
+# BASE INTEGRAL DE REGRAS CLÍNICAS (AGS BEERS 2023)
+# ==============================================================================
 BEERS_RULES = {
+    # --- ANTI-HISTAMÍNICOS DE 1ª GERAÇÃO & ANTICOLINÉRGICOS CENTRAIS ---
     "dexclorfeniramina": {
         "drug": "Dexclorfeniramina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -107,6 +134,15 @@ BEERS_RULES = {
         "tapering": "Substituir por medidas não farmacológicas ou analgésicos simples quando apropriado.",
         "sos_note": "Uso como antiespasmódico pontual de resgate SN/QN: Reavaliar a necessidade caso a dor abdominal persista; vigiar globo vesical."
     },
+    "atropina": {
+        "drug": "Atropina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar o uso em geriatria, exceto em bradicardia grave hemodinamicamente instável ou intoxicação colinérgica.",
+        "rationale": "Intenso bloqueio parassimpático central e periférico com precipitação fulminante de delírio e retenção urinária.",
+        "tapering": "Restringir estritamente ao ambiente de ressuscitação/emergência.",
+        "sos_note": "Aceito unicamente para protocolos agudos de suporte avançado de vida (ACLS)."
+    },
     "biperideno": {
         "drug": "Biperideno",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -116,21 +152,50 @@ BEERS_RULES = {
         "tapering": "Reduzir 50% da dose a cada 3 a 5 dias antes da suspensão definitiva para evitar efeito colinérgico rebote.",
         "sos_note": "Não recomendado em esquema de resgate rotineiro."
     },
+    "triexifenidil": {
+        "drug": "Triexifenidil",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar em idosos para sintomas parkinsonianos.",
+        "rationale": "Toxicidade neuropsiquiátrica anticolinérgica grave.",
+        "tapering": "Redução paulatina semanal.",
+        "sos_note": "Uso contínuo; evitar."
+    },
     "oxibutinina": {
         "drug": "Oxibutinina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
         "renal_dependent": False,
-        "recommendation": "Evitar para incontinência urinária em idosos.",
+        "recommendation": "Evitar para incontinência urinária de urgência em idosos.",
         "rationale": "Potente bloqueador muscarínico. Agrava constipação e piora o declínio cognitivo pré-existente.",
         "tapering": "Desprescrever gradualmente; considerar fisioterapia uroginecológica ou agonista beta-3 (Mirabegrona).",
         "sos_note": "Medicamento de ação contínua; não possui indicação posológica de resgate."
     },
+    "tolterodina": {
+        "drug": "Tolterodina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar para hiperatividade vesical em geriatria.",
+        "rationale": "Efeitos adversos anticolinérgicos e risco aumentado de retenção urinária.",
+        "tapering": "Desprescrição gradual.",
+        "sos_note": "Fármaco de uso fixo."
+    },
+    "solifenacina": {
+        "drug": "Solifenacina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar ou usar com máxima cautela em idosos com demência.",
+        "rationale": "Mesmo com seletividade M3, mantém impacto anticolinérgico em idosos frágeis.",
+        "tapering": "Descontinuar se houver piora cognitiva.",
+        "sos_note": "Uso contínuo."
+    },
+
+    # --- BENZODIAZEPÍNICOS E HIPNÓTICOS (DROGAS Z) ---
     "diazepam": {
         "drug": "Diazepam",
         "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
         "renal_dependent": False,
         "recommendation": "Evitar o uso crônico ou agudo em enfermarias e UTIs geriátricas.",
-        "rationale": "Meia-vida longa e acúmulo de metabólitos ativos. Risco extremo de sonolência diurna, ataxia, quedas com fraturas e delirium.",
+        "rationale": "Meia-vida longa (> 48h) e acúmulo de metabólitos ativos. Risco extremo de sonolência diurna, ataxia, quedas com fraturas e delirium.",
         "tapering": "Desmame lento: diminuir 25% da dose a cada 1 a 2 semanas sob supervisão médica/farmacêutica para prevenir crise de abstinência.",
         "sos_note": "Se prescrito em crise convulsiva aguda, o uso é justificado. Para agitação ou insônia pontual, evitar devido ao risco de perda do equilíbrio postural."
     },
@@ -161,6 +226,15 @@ BEERS_RULES = {
         "tapering": "Reduzir 0,25mg semanalmente sob vigilância de sintomas de ansiedade de rebote.",
         "sos_note": "Alto potencial de indução de efeito rebote nas horas seguintes."
     },
+    "bromazepam": {
+        "drug": "Bromazepam",
+        "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar o uso em idosos.",
+        "rationale": "Sedação residual, prejuízo da marcha, reflexos lentificados e risco elevado de quedas.",
+        "tapering": "Desmame paulatino em 2 a 3 semanas.",
+        "sos_note": "Não utilizar como medicação de resgate para sono."
+    },
     "midazolam": {
         "drug": "Midazolam",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar exceto procedimentos)",
@@ -188,6 +262,8 @@ BEERS_RULES = {
         "tapering": "Desmame em 7 a 10 dias.",
         "sos_note": "Risco de sonolência residual matinal e acidentes ao levantar."
     },
+
+    # --- ANTIDEPRESSIVOS TRICÍCLICOS ---
     "amitriptilina": {
         "drug": "Amitriptilina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -215,6 +291,26 @@ BEERS_RULES = {
         "tapering": "Desmame gradual ao longo de 2 a 4 semanas.",
         "sos_note": "Uso de manutenção exclusivo."
     },
+    "imipramina": {
+        "drug": "Imipramina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar em geriatria.",
+        "rationale": "Hipotensão ortostática, sedação intensa e bloqueio colinérgico muscarínico acentuado.",
+        "tapering": "Descontinuação progressiva.",
+        "sos_note": "Uso crônico."
+    },
+    "paroxetina": {
+        "drug": "Paroxetina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar na 1ª linha de depressão/ansiedade em idosos.",
+        "rationale": "É o ISRS com maior atividade anticolinérgica e risco de sedação.",
+        "tapering": "Substituir gradualmente por Sertralina ou Escitalopram.",
+        "sos_note": "Fármaco de uso contínuo."
+    },
+
+    # --- ANTIPSICÓTICOS TÍPICOS E ATÍPICOS ---
     "haloperidol": {
         "drug": "Haloperidol",
         "axis": "AGS Beers 2023 - Tabela 2 e 3 (Evitar com ressalvas)",
@@ -241,6 +337,15 @@ BEERS_RULES = {
         "rationale": "Hipotensão severa, sonolência profunda e risco exacerbado de quedas hospitalares.",
         "tapering": "Descontinuação progressiva.",
         "sos_note": "Sedação excessiva associada a perda de reflexos de proteção das vias aéreas."
+    },
+    "tioridazina": {
+        "drug": "Tioridazina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar absolutamente.",
+        "rationale": "Prolongamento do intervalo QT com risco de Torsades de Pointes e arritmias ventriculares fatais.",
+        "tapering": "Substituição imediata com monitoramento por ECG.",
+        "sos_note": "Contraindicado."
     },
     "quetiapina": {
         "drug": "Quetiapina",
@@ -269,6 +374,8 @@ BEERS_RULES = {
         "tapering": "Usar a menor dose eficaz e limitar a duração ao menor tempo possível.",
         "sos_note": "Limitar a episódios agudos refratários de delírio e evitar manutenção contínua inadvertida."
     },
+
+    # --- TRATO GASTROINTESTINAL E PROCINÉTICOS ---
     "metoclopramida": {
         "drug": "Metoclopramida",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -277,6 +384,33 @@ BEERS_RULES = {
         "rationale": "Antagonismo D2 central. Causa discinesia tardia frequentemente irreversível, acatisia e parkinsonismo medicamentoso.",
         "tapering": "Substituir por Ondansetrona ou Domperidona por curto período com monitoramento eletrocardiográfico.",
         "sos_note": "Uso SN/QN para náuseas agudas: Preferir ondansetrona; se administrada, não exceder 12 semanas e vigiar sinais extrapiramidais."
+    },
+    "domperidona": {
+        "drug": "Domperidona",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar em doses altas / risco de QT)",
+        "renal_dependent": False,
+        "recommendation": "Evitar uso prolongado ou doses > 30mg/dia.",
+        "rationale": "Risco de arritmias ventriculares graves e morte súbita cardíaca em pacientes > 60 anos.",
+        "tapering": "Limitar duração máxima ao menor período possível (< 7 dias).",
+        "sos_note": "Monitorar intervalo QT."
+    },
+    "cimetidina": {
+        "drug": "Cimetidina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar em idosos.",
+        "rationale": "Inibidor potente de CYP450 (múltiplas interações) e efeitos colinérgicos centrais associados a delírio e confusão mental.",
+        "tapering": "Substituir por outro protetor gástrico.",
+        "sos_note": "Contraindicado."
+    },
+    "ranitidina": {
+        "drug": "Ranitidina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar em Delirium)",
+        "renal_dependent": True,
+        "recommendation": "Evitar em idosos com declínio cognitivo ou delirium.",
+        "rationale": "Associação com piora do estado mental agudo.",
+        "tapering": "Desprescrição direta.",
+        "sos_note": "Vigiar estado mental."
     },
     "omeprazol": {
         "drug": "Omeprazol",
@@ -305,6 +439,8 @@ BEERS_RULES = {
         "tapering": "Substituir por laxantes osmóticos seguros (ex.: Lactulose ou Macrogol / PEG).",
         "sos_note": "Mesmo em doses únicas para constipação aguda, a via oral deve ser evitada se houver risco de engasgo."
     },
+
+    # --- RELAXANTES MUSCULARES ---
     "ciclobenzaprina": {
         "drug": "Ciclobenzaprina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -332,6 +468,26 @@ BEERS_RULES = {
         "tapering": "Substituir por dipirona ou paracetamol isolados.",
         "sos_note": "Muito comum em analgésicos de resgate (ex.: Dorflex). Recomenda-se prescrever dipirona pura no lugar."
     },
+    "baclofeno": {
+        "drug": "Baclofeno",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar / Ajuste renal)",
+        "renal_dependent": True,
+        "recommendation": "Evitar ou usar em dose mínima ajustada; risco de encefalopatia.",
+        "rationale": "Sedação profunda, confusão e neurotoxicidade grave em idosos com ClCr < 60 mL/min.",
+        "tapering": "Desmame cauteloso.",
+        "sos_note": "Não usar em doses de resgate."
+    },
+    "tizanidina": {
+        "drug": "Tizanidina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar em geriatria.",
+        "rationale": "Agonista alfa-2; causa hipotensão acentuada, sedação e boca seca.",
+        "tapering": "Suspensão paulatina.",
+        "sos_note": "Evitar."
+    },
+
+    # --- ANTI-INFLAMATÓRIOS NÃO ESTEROIDAIS (AINES) ---
     "diclofenaco": {
         "drug": "Diclofenaco",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar uso crônico)",
@@ -395,6 +551,17 @@ BEERS_RULES = {
         "tapering": "Suspensão imediata.",
         "sos_note": "Contraindicado em regime crônico ou pontual."
     },
+    "indometacina": {
+        "drug": "Indometacina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": True,
+        "recommendation": "Evitar em qualquer cenário na geriatria.",
+        "rationale": "É o AINE com maior toxicidade gástrica e de SNC (cefaleia grave, tontura e delírio).",
+        "tapering": "Interrupção imediata.",
+        "sos_note": "Contraindicado."
+    },
+
+    # --- CARDIOVASCULARES E ANTI-HIPERTENSIVOS ---
     "digoxina": {
         "drug": "Digoxina",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar como 1ª linha / Dose > 0.125mg)",
@@ -458,6 +625,17 @@ BEERS_RULES = {
         "tapering": "Se utilizada para HPB, manter monitoramento pressórico sentado/em pé rigoroso.",
         "sos_note": "Uso noturno fixo recomendado para minimizar risco de quedas ortostáticas."
     },
+    "prazosina": {
+        "drug": "Prazosina",
+        "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
+        "renal_dependent": False,
+        "recommendation": "Evitar para hipertensão em idosos.",
+        "rationale": "Hipotensão da primeira dose e síncope postural grave.",
+        "tapering": "Substituição por outros anti-hipertensivos.",
+        "sos_note": "Uso fixo."
+    },
+
+    # --- ANTIDIABÉTICOS (SULFONILUREIAS DE AÇÃO PROLONGADA) ---
     "glibenclamida": {
         "drug": "Glibenclamida",
         "axis": "AGS Beers 2023 - Tabela 2 (Evitar)",
@@ -476,6 +654,8 @@ BEERS_RULES = {
         "tapering": "Transicionar para opções com menor risco de hipoglicemia.",
         "sos_note": "Uso de manutenção diário."
     },
+
+    # --- ANALGÉSICOS OPIOIDES E ADJUVANTES ---
     "tramadol": {
         "drug": "Tramadol",
         "axis": "AGS Beers 2023 - Tabela 2 e 5 (Evitar / Risco de SIADH e Síndrome Serotoninérgica)",
@@ -514,7 +694,11 @@ BEERS_RULES = {
     }
 }
 
+# ==============================================================================
+# DICIONÁRIO COMPLETO DE SINÔNIMOS E NOMES COMERCIAIS BRASILEIROS
+# ==============================================================================
 SYNONYM_MAP = {
+    # Anti-histamínicos
     "dexclorfeniramina": "dexclorfeniramina",
     "maleato de dexclorfeniramina": "dexclorfeniramina",
     "polaramine": "dexclorfeniramina",
@@ -523,86 +707,149 @@ SYNONYM_MAP = {
     "clorfeniramina": "dexclorfeniramina",
     "coristina": "dexclorfeniramina",
     "hidroxizina": "hidroxizina",
+    "cloridrato de hidroxizina": "hidroxizina",
     "hixizine": "hidroxizina",
     "prurizin": "hidroxizina",
     "prometazina": "prometazina",
+    "cloridrato de prometazina": "prometazina",
     "fenergan": "prometazina",
     "dimenidrinato": "dimenidrinato",
     "dramin": "dimenidrinato",
     "dramin b6": "dimenidrinato",
     "difenidramina": "difenidramina",
     "benadryl": "difenidramina",
+
+    # Antiespasmódicos e Anticolinérgicos
     "escopolamina": "escopolamina",
     "buscopan": "escopolamina",
     "hioscina": "escopolamina",
     "butilbrometo de escopolamina": "escopolamina",
+    "atropina": "atropina",
+    "sulfato de atropina": "atropina",
     "biperideno": "biperideno",
+    "cloridrato de biperideno": "biperideno",
     "akineton": "biperideno",
+    "triexifenidil": "triexifenidil",
+    "artane": "triexifenidil",
     "oxibutinina": "oxibutinina",
+    "cloridrato de oxibutinina": "oxibutinina",
     "retemic": "oxibutinina",
+    "tolterodina": "tolterodina",
+    "detrusitol": "tolterodina",
+    "solifenacina": "solifenacina",
+    "vesicare": "solifenacina",
+
+    # Benzodiazepínicos e Drogas Z
     "diazepam": "diazepam",
     "valium": "diazepam",
+    "dienpax": "diazepam",
     "clonazepam": "clonazepam",
     "rivotril": "clonazepam",
     "lorazepam": "lorazepam",
     "lorax": "lorazepam",
     "alprazolam": "alprazolam",
     "frontin": "alprazolam",
+    "apraz": "alprazolam",
+    "bromazepam": "bromazepam",
+    "lexotan": "bromazepam",
     "midazolam": "midazolam",
     "dormonid": "midazolam",
     "zolpidem": "zolpidem",
+    "hemitartarato de zolpidem": "zolpidem",
     "stilnox": "zolpidem",
     "patz": "zolpidem",
     "zopiclona": "zopiclona",
     "imovane": "zopiclona",
+
+    # Antidepressivos
     "amitriptilina": "amitriptilina",
+    "cloridrato de amitriptilina": "amitriptilina",
     "tryptanol": "amitriptilina",
     "amytril": "amitriptilina",
     "nortriptilina": "nortriptilina",
     "pamelor": "nortriptilina",
     "clomipramina": "clomipramina",
     "anafranil": "clomipramina",
+    "imipramina": "imipramina",
+    "tofranil": "imipramina",
+    "paroxetina": "paroxetina",
+    "aropax": "paroxetina",
+    "pondera": "paroxetina",
+
+    # Antipsicóticos
     "haloperidol": "haloperidol",
     "haldol": "haloperidol",
     "clorpromazina": "clorpromazina",
     "amplictil": "clorpromazina",
     "levomepromazina": "levomepromazina",
     "neozine": "levomepromazina",
+    "tioridazina": "tioridazina",
+    "melleril": "tioridazina",
     "quetiapina": "quetiapina",
+    "hemifumarato de quetiapina": "quetiapina",
     "seroquel": "quetiapina",
     "olanzapina": "olanzapina",
     "zyprexa": "olanzapina",
     "risperidona": "risperidona",
     "risperdal": "risperidona",
+
+    # Gastrointestinais
     "metoclopramida": "metoclopramida",
+    "cloridrato de metoclopramida": "metoclopramida",
     "plasil": "metoclopramida",
+    "domperidona": "domperidona",
+    "motilium": "domperidona",
+    "cimetidina": "cimetidina",
+    "ranitidina": "ranitidina",
+    "antak": "ranitidina",
     "omeprazol": "omeprazol",
     "losec": "omeprazol",
     "pantoprazol": "pantoprazol",
     "pantocal": "pantoprazol",
     "oleo mineral": "oleo mineral",
     "nujol": "oleo mineral",
+
+    # Relaxantes Musculares
     "ciclobenzaprina": "ciclobenzaprina",
+    "cloridrato de ciclobenzaprina": "ciclobenzaprina",
     "miosan": "ciclobenzaprina",
     "musculare": "ciclobenzaprina",
     "carisoprodol": "carisoprodol",
     "tandrilax": "carisoprodol",
     "torsilax": "carisoprodol",
     "orfenadrina": "orfenadrina",
+    "citrato de orfenadrina": "orfenadrina",
     "dorflex": "orfenadrina",
+    "baclofeno": "baclofeno",
+    "lioresal": "baclofeno",
+    "tizanidina": "tizanidina",
+    "sirdalud": "tizanidina",
+
+    # AINEs
     "diclofenaco": "diclofenaco",
+    "diclofenaco sodico": "diclofenaco",
+    "diclofenaco potassico": "diclofenaco",
     "voltaren": "diclofenaco",
     "cataflam": "diclofenaco",
     "ibuprofeno": "ibuprofeno",
     "advil": "ibuprofeno",
+    "alivium": "ibuprofeno",
     "cetoprofeno": "cetoprofeno",
     "profenid": "cetoprofeno",
     "cetorolaco": "cetorolaco",
+    "trometamol cetorolaco": "cetorolaco",
     "toradol": "cetorolaco",
     "nimesulida": "nimesulida",
     "nisulid": "nimesulida",
+    "scaflam": "nimesulida",
     "meloxicam": "meloxicam",
+    "movatec": "meloxicam",
     "piroxicam": "piroxicam",
+    "feldene": "piroxicam",
+    "indometacina": "indometacina",
+    "indocid": "indometacina",
+
+    # Cardiovasculares
     "digoxina": "digoxina",
     "digox": "digoxina",
     "lanoxin": "digoxina",
@@ -617,27 +864,49 @@ SYNONYM_MAP = {
     "nifedipino": "nifedipino",
     "adalat": "nifedipino",
     "doxazosina": "doxazosina",
+    "mesilato de doxazosina": "doxazosina",
     "carduran": "doxazosina",
+    "prazosina": "prazosina",
+    "minipress": "prazosina",
+
+    # Antidiabéticos
     "glibenclamida": "glibenclamida",
     "daonil": "glibenclamida",
     "glimepirida": "glimepirida",
     "amaryl": "glimepirida",
+
+    # Opioides e Analgésicos
     "tramadol": "tramadol",
+    "cloridrato de tramadol": "tramadol",
     "tramal": "tramadol",
     "codeina": "codeina",
+    "fosfato de codeina": "codeina",
     "tylex": "codeina",
+    "paco": "codeina",
     "morfina": "morfina",
+    "sulfato de morfina": "morfina",
     "dimorf": "morfina",
     "meperidina": "meperidina",
     "petidina": "meperidina",
     "dolantina": "meperidina",
+
+    # Fármacos Mapeados para Interações da Tabela 4
     "losartana": "losartana",
+    "losartana potassica": "losartana",
+    "aradois": "losartana",
     "enalapril": "enalapril",
+    "maleato de enalapril": "enalapril",
+    "renitec": "enalapril",
     "captopril": "captopril",
+    "capoten": "captopril",
     "ramipril": "ramipril",
+    "triatec": "ramipril",
     "valsartana": "valsartana",
+    "diovan": "valsartana",
     "candesartana": "candesartana",
+    "atacand": "candesartana",
     "varfarina": "varfarina",
+    "varfarina sodica": "varfarina",
     "marevan": "varfarina",
     "coumadin": "varfarina",
     "rivaroxabana": "rivaroxabana",
@@ -647,8 +916,10 @@ SYNONYM_MAP = {
     "dabigatrana": "dabigatrana",
     "pradaxa": "dabigatrana",
     "enoxaparina": "enoxaparina",
+    "enoxaparina sodica": "enoxaparina",
     "clexane": "enoxaparina",
-    "heparina": "heparina"
+    "heparina": "heparina",
+    "heparina sodica": "heparina"
 }
 
 def identify_drug_canonical(input_text: str) -> Optional[str]:
@@ -671,18 +942,22 @@ def identify_drug_canonical(input_text: str) -> Optional[str]:
 
     return None
 
+# ==============================================================================
+# DETECTOR DA TABELA 4 DE BEERS (INTERAÇÕES MEDICAMENTOSAS DE ALTO RISCO)
+# ==============================================================================
 def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     table_4_alerts = []
     med_tag_map = {}
     meds = set(active_canonicals)
 
     opioids = {"tramadol", "codeina", "morfina", "meperidina"}
-    bzds_and_z = {"diazepam", "clonazepam", "lorazepam", "alprazolam", "midazolam", "zolpidem", "zopiclona"}
+    bzds_and_z = {"diazepam", "clonazepam", "lorazepam", "alprazolam", "bromazepam", "midazolam", "zolpidem", "zopiclona"}
     ras_inhibitors = {"losartana", "enalapril", "captopril", "ramipril", "valsartana", "candesartana"}
-    nsaids = {"diclofenaco", "ibuprofeno", "cetoprofeno", "cetorolaco", "nimesulida", "meloxicam", "piroxicam"}
+    nsaids = {"diclofenaco", "ibuprofeno", "cetoprofeno", "cetorolaco", "nimesulida", "meloxicam", "piroxicam", "indometacina"}
     anticoagulants = {"varfarina", "rivaroxabana", "apixabana", "dabigatrana", "enoxaparina", "heparina"}
-    cns_drugs = opioids | bzds_and_z | {"haloperidol", "quetiapina", "olanzapina", "risperidona", "amitriptilina", "nortriptilina", "clomipramina"}
+    cns_drugs = opioids | bzds_and_z | {"haloperidol", "quetiapina", "olanzapina", "risperidona", "clorpromazina", "levomepromazina", "amitriptilina", "nortriptilina", "clomipramina", "imipramina", "paroxetina"}
 
+    # Interação 1: Opioide + Benzodiazepínico / Droga Z
     found_op = meds.intersection(opioids)
     found_bzd = meds.intersection(bzds_and_z)
     if found_op and found_bzd:
@@ -699,6 +974,7 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
+    # Interação 2: IECA/BRA + Espironolactona
     found_ras = meds.intersection(ras_inhibitors)
     if found_ras and "espironolactona" in meds:
         for m in found_ras:
@@ -715,6 +991,7 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
+    # Interação 3: Anticoagulante + AINE
     found_anticoag = meds.intersection(anticoagulants)
     found_nsaid = meds.intersection(nsaids)
     if found_anticoag and found_nsaid:
@@ -731,6 +1008,7 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
             "acb_score": 0
         })
 
+    # Interação 4: 3 ou mais agentes ativos no SNC (Polifarmácia Psicotrópica)
     found_cns = meds.intersection(cns_drugs)
     if len(found_cns) >= 3:
         for m in found_cns:
@@ -749,6 +1027,9 @@ def check_beers_table_4_interactions(active_canonicals: List[str]) -> Tuple[List
 
     return table_4_alerts, med_tag_map
 
+# ==============================================================================
+# MOTOR CONSOLIDADO DE AVALIAÇÃO DE BEERS 2023
+# ==============================================================================
 def evaluate_patient_beers(
     medications: List[Dict[str, Any]],
     age: int,
@@ -796,9 +1077,10 @@ def evaluate_patient_beers(
 
             if fall_risk and canonical in [
                 "dexclorfeniramina", "hidroxizina", "difenidramina", "prometazina",
-                "diazepam", "clonazepam", "lorazepam", "alprazolam", "midazolam",
-                "zolpidem", "zopiclona", "amitriptilina", "quetiapina", "risperidona",
-                "olanzapina", "haloperidol", "clonidina", "tramadol"
+                "diazepam", "clonazepam", "lorazepam", "alprazolam", "bromazepam",
+                "midazolam", "zolpidem", "zopiclona", "amitriptilina", "nortriptilina",
+                "clomipramina", "imipramina", "quetiapina", "risperidona", "olanzapina",
+                "haloperidol", "clorpromazina", "levomepromazina", "clonidina", "tramadol"
             ]:
                 rec += " [ALERTA DE QUEDAS]: Paciente com risco elevado documentado; este fármaco aumenta expressivamente quedas e fraturas."
 
@@ -808,6 +1090,8 @@ def evaluate_patient_beers(
                         rec += f" [CONTRAINDICAÇÃO RENAL CrCl={crcl} mL/min]: Eliminação prejudicada com acúmulo de toxicidade letal. Suspender ou substituir."
                     elif canonical == "glibenclamida" and crcl < 50:
                         rec += f" [ALERTA RENAL CrCl={crcl} mL/min]: Alto risco de hipoglicemia prolongada refratária."
+                    elif canonical == "baclofeno" and crcl < 60:
+                        rec += f" [ALERTA RENAL CrCl={crcl} mL/min]: Alto risco de neurotoxicidade e confusão mental por acúmulo."
                 else:
                     rec += " [ATENÇÃO DE VIGILÂNCIA RENAL]: A depuração deste fármaco depende da filtração glomerular. Recomenda-se inserir creatinina sérica para assegurar CrCl > 30 mL/min."
 
@@ -822,9 +1106,11 @@ def evaluate_patient_beers(
                 "acb_score": acb_pts
             })
 
+    # Adiciona as Interações de Alto Risco da Tabela 4
     table_4_alerts, med_tag_map = check_beers_table_4_interactions(canonicals_list)
     alerts.extend(table_4_alerts)
 
+    # Classificação do Escore Anticolinérgico Total
     if total_acb_score >= 3:
         acb_interpretation = f"Carga Crítica ({total_acb_score} pontos) — Elevado risco de precipitação de delirium hospitalar, declínio cognitivo e retenção urinária aguda nas próximas 24-48h."
     elif total_acb_score in [1, 2]:
