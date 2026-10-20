@@ -85,12 +85,12 @@
   <div id="manualModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-3 sm:p-4 no-print">
     <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden">
       
-      <div class="bg-[#0b2447] text-white px-5 py-3.5 flex justify-between items-center">
+      <div class="bg-[#0b2447] text-white px-5 py-3.5 flex justify-between items-center sticky top-0 z-10">
         <div class="flex items-center gap-2">
           <i data-lucide="book-open" class="w-5 h-5 text-cyan-400"></i>
           <h3 class="text-sm font-bold tracking-wide uppercase">Manual Operacional FarmBeers</h3>
         </div>
-        <button type="button" onclick="toggleManualModal(false)" class="text-slate-300 hover:text-white p-1">
+        <button type="button" onclick="toggleManualModal(false)" class="text-slate-300 hover:text-white p-2 -mr-1">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -151,7 +151,7 @@
         <h3 class="text-xs font-bold uppercase text-slate-800 flex items-center gap-1.5">
           <i data-lucide="check-square" class="w-4 h-4 text-cyan-600"></i> Conferência de Fármacos Extraídos (PDF)
         </h3>
-        <button onclick="togglePdfReviewModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+        <button onclick="togglePdfReviewModal(false)" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
       <p class="text-[11px] text-slate-500">
         Confirme os medicamentos e posologias identificadas no documento antes de inseri-los na lista ativa:
@@ -171,7 +171,7 @@
         <h3 class="text-sm font-bold uppercase text-slate-800 flex items-center gap-2">
           <i data-lucide="users" class="w-4 h-4 text-cyan-600"></i> Gestão de Usuários do Sistema
         </h3>
-        <button onclick="toggleUsersModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+        <button onclick="toggleUsersModal(false)" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
 
       <form onsubmit="handleCreateUser(event)" class="bg-slate-50 p-3 rounded border border-slate-200 space-y-2">
@@ -207,85 +207,105 @@
     </div>
   </div>
 
-  <!-- MODAL: INDICADORES CLÍNICOS CFT (ADMIN) -->
-  <div id="metricsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4 no-print">
-    <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl p-6 border border-slate-200 space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
+  <!-- MODAL: INDICADORES CLÍNICOS CFT (RESPONSIVO E COM BOTÃO X SEMPRE VISÍVEL) -->
+  <div id="metricsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-3 sm:p-4 no-print">
+    <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
+      
+      <!-- CABEÇALHO FIXO COM BOTÃO FECHAR EM DESTAQUE -->
+      <div class="bg-white px-5 py-3.5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
         <div>
-          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
             <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-600"></i> Indicadores Clínicos de Beers & CFT
           </h3>
-          <p class="text-xs text-slate-500">Métricas consolidadas de intervenção e taxa de aceitação médica para pesquisa</p>
+          <p class="text-[11px] text-slate-500 hidden sm:block">Métricas consolidadas de intervenção e taxa de aceitação médica para pesquisa</p>
         </div>
-        <button onclick="toggleMetricsModal(false)" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-
-      <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center gap-3 text-xs">
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Dia</label>
-          <input type="number" id="filterDay" min="1" max="31" placeholder="Ex: 15" class="w-16 p-1.5 border rounded bg-white outline-none">
-        </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Mês</label>
-          <select id="filterMonth" class="p-1.5 border rounded bg-white outline-none">
-            <option value="">Todos</option>
-            <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
-            <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-            <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-            <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
-          <input type="number" id="filterYear" value="2026" class="w-20 p-1.5 border rounded bg-white outline-none">
-        </div>
-        <button type="button" onclick="loadMetricsData()" class="mt-4 bg-[#0b2447] hover:bg-[#19376d] text-white font-bold px-3 py-1.5 rounded shadow">
-          Filtrar Período
+        <button type="button" onclick="toggleMetricsModal(false)" class="text-slate-500 hover:text-slate-800 p-2 -mr-1 rounded-lg hover:bg-slate-100" title="Fechar Indicadores">
+          <i data-lucide="x" class="w-6 h-6 text-slate-700"></i>
         </button>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-        <div class="bg-cyan-50/70 p-3 rounded-lg border border-cyan-200 text-center">
-          <span class="text-[9px] font-bold text-cyan-800 uppercase tracking-wider block">Total Pacientes</span>
-          <strong id="metricTotalPatients" class="text-xl font-extrabold text-[#0b2447] mt-0.5 block">0</strong>
+      <!-- CORPO ROLÁVEL COM PADDING SEGURO -->
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
+        
+        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center gap-2.5 text-xs">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Dia</label>
+            <input type="number" id="filterDay" min="1" max="31" placeholder="Todos" class="w-16 p-1.5 border rounded bg-white outline-none">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Mês</label>
+            <select id="filterMonth" class="p-1.5 border rounded bg-white outline-none">
+              <option value="">Todos os Meses</option>
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
+              <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
+              <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
+            <input type="number" id="filterYear" placeholder="Geral" class="w-20 p-1.5 border rounded bg-white outline-none">
+          </div>
+          <button type="button" onclick="loadMetricsData()" class="mt-4 bg-[#0b2447] hover:bg-[#19376d] text-white font-bold px-3 py-1.5 rounded shadow">
+            Filtrar Período
+          </button>
+          <button type="button" onclick="clearMetricsFilter()" class="mt-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1.5 rounded">
+            Limpar Filtros
+          </button>
         </div>
-        <div class="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 text-center">
-          <span class="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
-          <strong id="metricTotalUPI" class="text-xl font-extrabold text-emerald-700 mt-0.5 block">0</strong>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="bg-cyan-50/70 p-3 rounded-lg border border-cyan-200 text-center">
+            <span class="text-[9px] font-bold text-cyan-800 uppercase tracking-wider block">Total Pacientes</span>
+            <strong id="metricTotalPatients" class="text-xl font-extrabold text-[#0b2447] mt-0.5 block">0</strong>
+          </div>
+          <div class="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 text-center">
+            <span class="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
+            <strong id="metricTotalUPI" class="text-xl font-extrabold text-emerald-700 mt-0.5 block">0</strong>
+          </div>
+          <div class="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 text-center">
+            <span class="text-[9px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
+            <strong id="metricTotalUTI" class="text-xl font-extrabold text-indigo-700 mt-0.5 block">0</strong>
+          </div>
+          <div class="bg-emerald-100/70 p-3 rounded-lg border border-emerald-300 text-center">
+            <span class="text-[9px] font-bold text-emerald-900 uppercase tracking-wider block">Aceitação Médica</span>
+            <strong id="metricAcceptanceRate" class="text-xl font-extrabold text-emerald-800 mt-0.5 block">0.0%</strong>
+          </div>
         </div>
-        <div class="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 text-center">
-          <span class="text-[9px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
-          <strong id="metricTotalUTI" class="text-xl font-extrabold text-indigo-700 mt-0.5 block">0</strong>
+
+        <div class="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-center">
+          <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Total de Alertas de Beers Identificados</span>
+          <strong id="metricTotalBeersAlerts" class="text-2xl font-extrabold text-amber-600 mt-0.5 block">0</strong>
         </div>
-        <div class="bg-emerald-100/70 p-3 rounded-lg border border-emerald-300 text-center">
-          <span class="text-[9px] font-bold text-emerald-900 uppercase tracking-wider block">Aceitação Médica</span>
-          <strong id="metricAcceptanceRate" class="text-xl font-extrabold text-emerald-800 mt-0.5 block">0.0%</strong>
+
+        <div class="border border-slate-200 rounded-lg p-3.5 bg-white">
+          <h4 class="text-xs font-bold uppercase text-slate-700 mb-2 flex items-center gap-1.5">
+            <i data-lucide="flame" class="w-4 h-4 text-rose-500"></i> Top 5 Medicamentos Inapropriados Mais Encontrados
+          </h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left min-w-[300px]">
+              <thead>
+                <tr class="border-b text-slate-400 uppercase text-[10px]">
+                  <th class="py-1.5">Fármaco de Beers</th>
+                  <th class="py-1.5 text-right">Ocorrências</th>
+                </tr>
+              </thead>
+              <tbody id="top5TableBody" class="divide-y divide-slate-100">
+                <tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro para o período.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+
       </div>
 
-      <div class="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-center">
-        <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Total de Alertas de Beers Identificados</span>
-        <strong id="metricTotalBeersAlerts" class="text-2xl font-extrabold text-amber-600 mt-0.5 block">0</strong>
+      <!-- RODAPÉ DE FECHAMENTO PARA DISPOSITIVOS MÓVEIS -->
+      <div class="bg-slate-100 px-5 py-2.5 border-t border-slate-200 flex justify-end">
+        <button type="button" onclick="toggleMetricsModal(false)" class="bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold px-4 py-2 rounded shadow">
+          Fechar Indicadores
+        </button>
       </div>
 
-      <div class="border border-slate-200 rounded-lg p-3.5 bg-white">
-        <h4 class="text-xs font-bold uppercase text-slate-700 mb-2 flex items-center gap-1.5">
-          <i data-lucide="flame" class="w-4 h-4 text-rose-500"></i> Top 5 Medicamentos Inapropriados Mais Encontrados
-        </h4>
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left min-w-[320px]">
-            <thead>
-              <tr class="border-b text-slate-400 uppercase text-[10px]">
-                <th class="py-1.5">Fármaco de Beers</th>
-                <th class="py-1.5 text-right">Ocorrências</th>
-              </tr>
-            </thead>
-            <tbody id="top5TableBody" class="divide-y divide-slate-100">
-              <tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro para o período.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -760,28 +780,39 @@
       if (show) {
         m.classList.remove("hidden");
         loadMetricsData();
+        lucide.createIcons();
       } else {
         m.classList.add("hidden");
       }
     }
 
+    function clearMetricsFilter() {
+      document.getElementById("filterDay").value = "";
+      document.getElementById("filterMonth").value = "";
+      document.getElementById("filterYear").value = "";
+      loadMetricsData();
+    }
+
     async function loadMetricsData() {
       const day = document.getElementById("filterDay").value;
       const month = document.getElementById("filterMonth").value;
-      const year = document.getElementById("filterYear").value || 2026;
+      const year = document.getElementById("filterYear").value;
 
-      let url = `/api/v1/admin/metrics?year=${year}`;
-      if (month) url += `&month=${month}`;
-      if (day) url += `&day=${day}`;
+      let params = new URLSearchParams();
+      if (year) params.append("year", year);
+      if (month) params.append("month", month);
+      if (day) params.append("day", day);
+
+      const qs = params.toString() ? `?${params.toString()}` : "";
 
       try {
-        const res = await fetch(url);
+        const res = await fetch(`/api/v1/admin/metrics${qs}`);
         const data = await res.json();
 
-        document.getElementById("metricTotalPatients").innerText = data.total_patients;
-        document.getElementById("metricTotalUPI").innerText = data.count_upi;
-        document.getElementById("metricTotalUTI").innerText = data.count_uti;
-        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts;
+        document.getElementById("metricTotalPatients").innerText = data.total_patients || 0;
+        document.getElementById("metricTotalUPI").innerText = data.count_upi || 0;
+        document.getElementById("metricTotalUTI").innerText = data.count_uti || 0;
+        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts || 0;
         document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate || 0}%`;
 
         const tbody = document.getElementById("top5TableBody");
@@ -797,10 +828,10 @@
             `;
           });
         } else {
-          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum medicamento registrado para este período.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado para este filtro.</td></tr>`;
         }
       } catch (e) {
-        console.error("Erro ao carregar indicadores.");
+        console.error("Erro ao carregar indicadores:", e);
       }
     }
 
@@ -1086,7 +1117,7 @@
       saveState();
     }
 
-    // Processamento Seguro com Renderização Garantida dos 3 Botões de Desfecho
+    // Processamento Seguro da Triagem com Trava Anti-Duplo Clique
     async function processCompleteScreening() {
       if (medicationsList.length === 0) {
         alert("Insira ao menos um medicamento para avaliar.");
@@ -1154,7 +1185,7 @@
             const ratText = a.rationale || "Medicamento potencialmente inapropriado pela diretriz AGS Beers.";
             const isSn = a.is_sos || false;
             const acbPts = a.acb_score || 0;
-            const alertId = a.id !== undefined && a.id !== null ? a.id : null;
+            const alertId = (a.id !== undefined && a.id !== null) ? a.id : null;
             
             const snTag = isSn ? '<span class="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded ml-2">Regime: SN / QN</span>' : '';
             const acbTag = acbPts > 0 ? `<span class="bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-bold px-2 py-0.5 rounded ml-1">ACB: +${acbPts}</span>` : '';
@@ -1168,7 +1199,6 @@
                  </div>`
               : '';
 
-            // Renderização garantida dos 3 botões em 100% dos cartões
             alertsHtml += `
               <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 shadow-sm">
                 <div class="flex justify-between items-center font-bold">
@@ -1181,7 +1211,7 @@
                 <div class="text-slate-600 bg-white p-2 rounded border border-slate-100"><strong>Racional Clínico:</strong> ${ratText}</div>
                 ${taperingHtml}
                 
-                <!-- BARRA DE AUDITORIA E DESFECHO CLÍNICO -->
+                <!-- BARRA DE AUDITORIA E DESFECHO CLÍNICO COM OS 3 BOTÕES SEMPRE EXIBIDOS -->
                 <div class="mt-2.5 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
                   <span class="text-[10px] font-bold uppercase text-slate-500">Desfecho com a Equipe Médica:</span>
                   <div class="flex flex-wrap items-center gap-1.5" id="outcomeContainer_${i}">
