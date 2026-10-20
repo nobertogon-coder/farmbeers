@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Com:
-- Registro de desfecho clínico (Aceitação Médica) para métricas científicas
-- Pool de conexão blindado contra desconexões no Render
-- Compatibilidade estrita com a coluna 'password' existente
-- Extração inteligente de PDF via Regex
+Blindagem Técnica:
+- Engine do banco protegida com pool_pre_ping e pool_recycle para o Render
+- Compatibilidade estrita com a coluna de banco 'password' e hash seguro SHA-256
+- Auditoria e gravação instantânea de Aceitação Médica
+- Mapeamento cruzado da Tabela 4 na listagem de medicamentos
 """
 import os
 import io
@@ -73,8 +73,7 @@ class ScreeningAlertRecord(Base):
     drug_name = Column(String(150), nullable=False)
     axis = Column(String(100), nullable=False)
     recommendation = Column(String(1000), nullable=False)
-    # Status da intervenção: 'pending', 'accepted', 'rejected'
-    outcome = Column(String(30), default="pending")
+    outcome = Column(String(30), default="pending")  # 'accepted', 'rejected', 'pending'
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
@@ -119,7 +118,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="4.0.0")
+app = FastAPI(title="FarmBeers System API", version="4.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -142,7 +141,7 @@ class CreateUserRequest(BaseModel):
     role: str
 
 class OutcomeRequest(BaseModel):
-    outcome: str  # 'accepted', 'rejected', 'pending'
+    outcome: str
 
 class MedicationInput(BaseModel):
     name: str
@@ -304,7 +303,7 @@ def get_metrics(year: int = 2026, month: Optional[int] = None, day: Optional[int
     }
 
 # ==============================================================================
-# ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO FARMACÊUTICA
+# AUDITORIA E ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO
 # ==============================================================================
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
@@ -316,14 +315,14 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
     return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA E PERSISTÊNCIA DE ID
+# MOTOR DE TRIAGEM COM CARGA ANTICOLINÉRGICA E RETORNO SEGURO
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     patient_age = payload.age if (payload.age and payload.age > 0) else 70
     med_dicts = [m.model_dump() for m in payload.medications]
 
-    alerts_raw, acb_total, acb_text = clinical_rules.evaluate_patient_beers(
+    alerts_raw, acb_total, acb_text, med_tag_map = clinical_rules.evaluate_patient_beers(
         medications=med_dicts,
         age=patient_age,
         fall_risk=bool(payload.fall_risk),
@@ -401,22 +400,24 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         if is_sn_flag and "[SN/QN]" not in dose_route_str:
             dose_route_str = f"{dose_route_str} [SN/QN]"
 
-        if matched:
-            med_rows.append({
-                "name": m.name,
-                "dose_route": dose_route_str,
-                "is_beers": True,
-                "is_sos": is_sn_flag,
-                "alert_tag": matched.get("axis", "AGS Beers 2023")
-            })
-        else:
-            med_rows.append({
-                "name": m.name,
-                "dose_route": dose_route_str,
-                "is_beers": False,
-                "is_sos": is_sn_flag,
-                "alert_tag": ""
-            })
+        # Prioriza a tag da Tabela 4 se o fármaco fizer parte de uma interação de alto risco
+        tag_str = ""
+        is_beers = False
+
+        if canonical and canonical in med_tag_map:
+            tag_str = med_tag_map[canonical]
+            is_beers = True
+        elif matched:
+            tag_str = matched.get("axis", "AGS Beers 2023")
+            is_beers = True
+
+        med_rows.append({
+            "name": m.name,
+            "dose_route": dose_route_str,
+            "is_beers": is_beers,
+            "is_sos": is_sn_flag,
+            "alert_tag": tag_str
+        })
 
     return {
         "total_beers_alerts": len(alerts_complete),
@@ -514,7 +515,7 @@ async def extract_pdf(file: UploadFile = File(...)):
     }
 
 # ==============================================================================
-# CARREGAMENTO DA PÁGINA
+# CARREGAMENTO DO FRONTEND
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
