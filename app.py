@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Blindagem Definitiva de Métricas e Gravação
+Blindagem Definitiva de Persistência e Indicadores Clínicos
 """
 import os
 import io
@@ -54,22 +54,22 @@ class ScreeningRecord(Base):
     __tablename__ = "screenings"
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    pharmacist_username = Column(String(50), default="admin")
-    sector = Column(String(50), default="UPI (Enfermaria)")
-    patient_age = Column(Integer, default=70)
+    pharmacist_username = Column(String(50), default="admin", nullable=True)
+    sector = Column(String(50), default="UPI (Enfermaria)", nullable=True)
+    patient_age = Column(Integer, default=70, nullable=True)
     crcl_ml_min = Column(Float, nullable=True)
-    acb_score = Column(Integer, default=0)
-    total_alerts = Column(Integer, default=0)
+    acb_score = Column(Integer, default=0, nullable=True)
+    total_alerts = Column(Integer, default=0, nullable=True)
     alerts = relationship("ScreeningAlertRecord", back_populates="screening", cascade="all, delete-orphan")
 
 class ScreeningAlertRecord(Base):
     __tablename__ = "screening_alerts"
     id = Column(Integer, primary_key=True, index=True)
-    screening_id = Column(Integer, ForeignKey("screenings.id"))
-    drug_name = Column(String(150), nullable=False)
-    axis = Column(String(100), nullable=False)
-    recommendation = Column(String(1000), nullable=False)
-    outcome = Column(String(30), default="pending")
+    screening_id = Column(Integer, ForeignKey("screenings.id", ondelete="CASCADE"), nullable=True)
+    drug_name = Column(String(150), nullable=False, default="Medicamento")
+    axis = Column(String(100), nullable=False, default="AGS Beers 2023")
+    recommendation = Column(String(1000), nullable=False, default="Reavaliar prescrição.")
+    outcome = Column(String(30), default="pending", nullable=True)
     screening = relationship("ScreeningRecord", back_populates="alerts")
 
 Base.metadata.create_all(bind=engine)
@@ -114,7 +114,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="6.5.0")
+app = FastAPI(title="FarmBeers System API", version="7.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -196,7 +196,7 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
     return {"status": "logged_out"}
 
 # ==============================================================================
-# GESTÃO DE UTILIZADORES
+# GESTÃO DE USUÁRIOS
 # ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
@@ -253,7 +253,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS DA CFT - CONSULTA DIRETA E INFALÍVEL
+# ROTA DE MÉTRICAS DA CFT - TOTALMENTE ROBUSTA
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
@@ -263,9 +263,9 @@ def get_metrics(
     db: Session = Depends(get_db)
 ):
     try:
-        all_screenings = db.query(ScreeningRecord).all()
+        all_screenings = db.query(ScreeningRecord).order_by(desc(ScreeningRecord.created_at)).all()
         
-        # Filtro em memória robusto contra discrepâncias de formato de data
+        # Filtragem flexível
         screenings = []
         for s in all_screenings:
             dt = s.created_at
@@ -296,7 +296,8 @@ def get_metrics(
 
             counts = {}
             for a in alerts:
-                counts[a.drug_name] = counts.get(a.drug_name, 0) + 1
+                d_name = a.drug_name or "Medicamento"
+                counts[d_name] = counts.get(d_name, 0) + 1
             sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
             top_5 = [{"drug": k, "count": v} for k, v in sorted_counts]
         else:
@@ -314,6 +315,7 @@ def get_metrics(
             "top_5_beers": top_5
         }
     except Exception as e:
+        print(f"Erro em metrics: {e}")
         return {
             "total_patients": 0,
             "count_upi": 0,
@@ -329,12 +331,16 @@ def get_metrics(
 # ==============================================================================
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
-    alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
-    if not alert_rec:
-        raise HTTPException(status_code=404, detail="Alerta não localizado.")
-    alert_rec.outcome = payload.outcome
-    db.commit()
-    return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
+    try:
+        alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
+        if not alert_rec:
+            return {"status": "not_found", "alert_id": alert_id}
+        alert_rec.outcome = payload.outcome
+        db.commit()
+        return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "detail": str(e)}
 
 # ==============================================================================
 # MOTOR DE TRIAGEM COM PERSISTÊNCIA COMPLETA E IMEDIATA
@@ -386,6 +392,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 persisted_records.append(alert_rec.id)
         except Exception as err:
             db.rollback()
+            print(f"Erro ao salvar triagem no banco: {err}")
 
     alerts_complete = []
     for idx, a in enumerate(alerts_raw):
