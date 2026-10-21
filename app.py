@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Com Auto-Migrador de Colunas e Persistência Garantida
+Persistência Controlada (Apenas 1 registro por triagem processada)
 """
 import os
 import io
@@ -20,7 +20,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# BANCO DE DADOS POSTGRESQL (PERSISTENTE E AUTO-MIGRADO)
+# BASE DE DADOS POSTGRESQL (PERSISTENTE E AUTO-MIGRADA)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -128,7 +128,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="8.5.0")
+app = FastAPI(title="FarmBeers System API", version="9.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -168,6 +168,7 @@ class ScreeningPayload(BaseModel):
     crcl_ml_min: Optional[float] = None
     crcl_notes: Optional[str] = ""
     medications: List[MedicationInput] = []
+    persist: Optional[bool] = True
 
 # ==============================================================================
 # AUTENTICAÇÃO
@@ -267,7 +268,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS DA CFT - TOTALMENTE ROBUSTA
+# ROTA DE MÉTRICAS DA CFT - CONTAGEM RIGOROSA E EXCLUSIVA POR SETOR
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
@@ -294,8 +295,16 @@ def get_metrics(
             screenings.append(s)
 
         total_patients = len(screenings)
-        count_uti = sum(1 for s in screenings if "uti" in (s.sector or "").lower())
-        count_upi = total_patients - count_uti
+        
+        # Contagem mutuamente exclusiva: se for UTI conta UTI, caso contrário é UPI
+        count_uti = 0
+        count_upi = 0
+        for s in screenings:
+            sec = (s.sector or "").strip().upper()
+            if "UTI" in sec:
+                count_uti += 1
+            else:
+                count_upi += 1
 
         s_ids = [s.id for s in screenings]
         total_alerts = 0
@@ -356,7 +365,7 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
         return {"status": "error", "detail": str(e)}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM PERSISTÊNCIA COMPLETA E IMEDIATA
+# MOTOR DE TRIAGEM COM GRAVAÇÃO ÚNICA E CONTROLADA
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -372,11 +381,14 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     )
 
     persisted_records = []
-    if payload.medications:
+    
+    # GRAVAÇÃO APENAS SE persist == True (quando clica em Processar Triagem)
+    if payload.medications and payload.persist:
         try:
             sec_val = str(payload.sector) if payload.sector else "UPI (Enfermaria)"
             crcl_val = float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None
 
+            # Cria APENAS 1 registro de paciente
             record = ScreeningRecord(
                 pharmacist_username="admin",
                 sector=sec_val,
@@ -390,6 +402,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(record)
 
+            # Grava os alertas vinculados àquele único paciente
             for a in alerts_raw:
                 d_name = str(a.get("drug") or a.get("drug_name") or "Medicamento")
                 alert_rec = ScreeningAlertRecord(
