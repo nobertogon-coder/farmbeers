@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Blindagem Definitiva de Persistência e Indicadores Clínicos
+Com Auto-Migrador de Colunas e Persistência Garantida
 """
 import os
 import io
@@ -14,13 +14,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
 import clinical_rules
 
 # ==============================================================================
-# BASE DE DADOS POSTGRESQL (PERSISTENTE E BLINDADA)
+# BANCO DE DADOS POSTGRESQL (PERSISTENTE E AUTO-MIGRADO)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -74,6 +74,21 @@ class ScreeningAlertRecord(Base):
 
 Base.metadata.create_all(bind=engine)
 
+# Auto-migrador: adiciona colunas que possam faltar em bancos já existentes
+def run_auto_migrations():
+    with engine.connect() as conn:
+        try:
+            if not DATABASE_URL.startswith("sqlite"):
+                conn.execute(text("ALTER TABLE screening_alerts ADD COLUMN IF NOT EXISTS outcome VARCHAR(30) DEFAULT 'pending';"))
+                conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS total_alerts INTEGER DEFAULT 0;"))
+                conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS acb_score INTEGER DEFAULT 0;"))
+                conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS crcl_ml_min DOUBLE PRECISION;"))
+                conn.commit()
+        except Exception as e:
+            print(f"Aviso na auto-migração: {e}")
+
+run_auto_migrations()
+
 def get_db():
     db = SessionLocal()
     try:
@@ -114,7 +129,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="7.0.0")
+app = FastAPI(title="FarmBeers System API", version="8.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -265,7 +280,6 @@ def get_metrics(
     try:
         all_screenings = db.query(ScreeningRecord).order_by(desc(ScreeningRecord.created_at)).all()
         
-        # Filtragem flexível
         screenings = []
         for s in all_screenings:
             dt = s.created_at
@@ -389,170 +403,4 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 db.add(alert_rec)
                 db.commit()
                 db.refresh(alert_rec)
-                persisted_records.append(alert_rec.id)
-        except Exception as err:
-            db.rollback()
-            print(f"Erro ao salvar triagem no banco: {err}")
-
-    alerts_complete = []
-    for idx, a in enumerate(alerts_raw):
-        d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
-        db_id = persisted_records[idx] if idx < len(persisted_records) else None
-        alerts_complete.append({
-            "id": db_id,
-            "drug": d_name,
-            "drug_name": d_name,
-            "axis": a.get("axis", "AGS Beers 2023"),
-            "recommendation": a.get("recommendation", "Reavaliar prescrição."),
-            "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
-            "tapering": a.get("tapering", ""),
-            "is_sos": a.get("is_sos", False),
-            "acb_score": a.get("acb_score", 0),
-            "outcome": "pending"
-        })
-
-    alert_by_canonical = {a["drug"].strip().lower(): a for a in alerts_complete}
-
-    med_rows = []
-    for m in payload.medications:
-        canonical = clinical_rules.identify_drug_canonical(m.name)
-        matched = None
-        if canonical:
-            c_key = canonical.strip().lower()
-            if c_key in alert_by_canonical:
-                matched = alert_by_canonical[c_key]
-            else:
-                for k, v in alert_by_canonical.items():
-                    if k in c_key or c_key in k:
-                        matched = v
-                        break
-
-        parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
-        dose_route_str = " ".join(parts) if parts else "VO (Oral)"
-
-        is_sn_flag = bool(m.is_sos) or any(t in dose_route_str.lower() for t in ["sn", "qn", "sos"])
-        if is_sn_flag and "[SN/QN]" not in dose_route_str:
-            dose_route_str = f"{dose_route_str} [SN/QN]"
-
-        tag_str = ""
-        is_beers = False
-
-        if canonical and canonical in med_tag_map:
-            tag_str = med_tag_map[canonical]
-            is_beers = True
-        elif matched:
-            tag_str = matched.get("axis", "AGS Beers 2023")
-            is_beers = True
-
-        med_rows.append({
-            "name": m.name,
-            "dose_route": dose_route_str,
-            "is_beers": is_beers,
-            "is_sos": is_sn_flag,
-            "alert_tag": tag_str
-        })
-
-    return {
-        "total_beers_alerts": len(alerts_complete),
-        "acb_score": acb_total,
-        "acb_interpretation": acb_text,
-        "alerts": alerts_complete,
-        "medication_rows": med_rows
-    }
-
-# ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR VIA REGEX
-# ==============================================================================
-def extract_posology_details(line: str):
-    dose = ""
-    route = "VO (Oral)"
-    freq = ""
-    is_sn = False
-
-    m_dose = re.search(r'(\b\d+[\.,]?\d*\s*(?:mg|g|mcg|ml|gotas|gota|ampola|amp|cp|comp|frasco)\b)', line, re.I)
-    if m_dose:
-        dose = m_dose.group(1).strip()
-
-    if re.search(r'\b(iv|ev|endovenos[ao]|intravenos[ao])\b', line, re.I):
-        route = "IV (Endovenoso)"
-    elif re.search(r'\b(im|intramuscular)\b', line, re.I):
-        route = "IM (Intramuscular)"
-    elif re.search(r'\b(sc|subcutane[ao])\b', line, re.I):
-        route = "SC (Subcutâneo)"
-    elif re.search(r'\b(inalat[oó]ri[ao]|neb|inal)\b', line, re.I):
-        route = "Inalatório"
-    elif re.search(r'\b(t[oó]pic[ao]|creme|pomada)\b', line, re.I):
-        route = "Tópico"
-    elif re.search(r'\b(vo|oral)\b', line, re.I):
-        route = "VO (Oral)"
-
-    if re.search(r'\b(sn|qn|sos|se\s+necess[aá]rio|quando\s+necess[aá]rio|a\s+crit[eé]rio\s+m[eé]dico|acm)\b', line, re.I):
-        is_sn = True
-        freq = "SN (Se Necessário)"
-    else:
-        m_freq = re.search(r'(\b\d{1,2}\s*/\s*\d{1,2}\s*h|\b\d{1,2}\s*em\s*\d{1,2}\s*h|\b\d{1,2}x\s*/\s*dia|\b\d{1,2}x\s*ao\s*dia|\b1x\b|\b2x\b|\b3x\b|\b4x\b|\bmanh[aã]\b|\bnoite\b|\b12/12h\b|\b8/8h\b|\b6/6h\b|\b24/24h\b)', line, re.I)
-        if m_freq:
-            freq = m_freq.group(1).strip()
-
-    return dose, route, freq, is_sn
-
-@app.post("/api/v1/prescription/extract-pdf")
-async def extract_pdf(file: UploadFile = File(...)):
-    contents = await file.read()
-    extracted_items = []
-    seen = set()
-    try:
-        with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if not text:
-                    continue
-                for line in text.split("\n"):
-                    line_clean = line.strip()
-                    if not line_clean:
-                        continue
-                    matched = clinical_rules.identify_drug_canonical(line_clean)
-                    if matched and matched not in seen:
-                        seen.add(matched)
-                        dose, route, freq, is_sn = extract_posology_details(line_clean)
-                        extracted_items.append({
-                            "name": matched.capitalize(),
-                            "dose": dose,
-                            "route": route,
-                            "frequency": freq,
-                            "is_sos": is_sn
-                        })
-                    else:
-                        for w in line_clean.split():
-                            w_clean = w.strip(".,;:()[]{}")
-                            if len(w_clean) >= 4:
-                                m_word = clinical_rules.identify_drug_canonical(w_clean)
-                                if m_word and m_word not in seen:
-                                    seen.add(m_word)
-                                    dose, route, freq, is_sn = extract_posology_details(line_clean)
-                                    extracted_items.append({
-                                        "name": m_word.capitalize(),
-                                        "dose": dose,
-                                        "route": route,
-                                        "frequency": freq,
-                                        "is_sos": is_sn
-                                    })
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
-
-    drug_names = [it["name"] for it in extracted_items]
-    return {
-        "medications": drug_names,
-        "drugs": drug_names,
-        "items": extracted_items
-    }
-
-# ==============================================================================
-# CARREGAMENTO DO FRONTEND
-# ==============================================================================
-@app.get("/", response_class=HTMLResponse)
-def read_root():
-    if os.path.exists("index.html"):
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    return "<h1>FarmBeers Online. Arquivo index.html não localizado.</h1>"
+                pers
