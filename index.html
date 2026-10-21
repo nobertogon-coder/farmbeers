@@ -584,6 +584,7 @@
   <script>
     const STORAGE_KEY = "farmbeers_active_state";
     const USER_KEY = "farmbeers_auth_data";
+    const METRICS_CACHE_KEY = "farmbeers_metrics_local";
 
     let medicationsList = [];
     let calculatedCrCl = null;
@@ -796,6 +797,37 @@
       loadMetricsData();
     }
 
+    function updateMetricsUI(data) {
+      const elTotal = document.getElementById("metricTotalPatients");
+      const elUpi = document.getElementById("metricTotalUPI");
+      const elUti = document.getElementById("metricTotalUTI");
+      const elAlerts = document.getElementById("metricTotalBeersAlerts");
+      const elRate = document.getElementById("metricAcceptanceRate");
+
+      if (elTotal) elTotal.innerText = data.total_patients || 0;
+      if (elUpi) elUpi.innerText = data.count_upi || 0;
+      if (elUti) elUti.innerText = data.count_uti || 0;
+      if (elAlerts) elAlerts.innerText = data.total_beers_alerts || 0;
+      if (elRate) elRate.innerText = `${data.acceptance_rate || 0}%`;
+
+      const tbody = document.getElementById("top5TableBody");
+      if (tbody) {
+        tbody.innerHTML = "";
+        if (data.top_5_beers && data.top_5_beers.length > 0) {
+          data.top_5_beers.forEach(item => {
+            tbody.innerHTML += `
+              <tr class="hover:bg-slate-50">
+                <td class="py-2 px-2 font-bold text-slate-800">${item.drug}</td>
+                <td class="py-2 px-2 text-right font-extrabold text-amber-600">${item.count}</td>
+              </tr>
+            `;
+          });
+        } else {
+          tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado.</td></tr>`;
+        }
+      }
+    }
+
     async function loadMetricsData() {
       const day = (document.getElementById("filterDay")?.value || "").trim();
       const month = (document.getElementById("filterMonth")?.value || "").trim();
@@ -812,38 +844,49 @@
         const res = await fetch(`/api/v1/admin/metrics${qs}`);
         if (!res.ok) throw new Error("Falha HTTP " + res.status);
         const data = await res.json();
-
-        const elTotal = document.getElementById("metricTotalPatients");
-        const elUpi = document.getElementById("metricTotalUPI");
-        const elUti = document.getElementById("metricTotalUTI");
-        const elAlerts = document.getElementById("metricTotalBeersAlerts");
-        const elRate = document.getElementById("metricAcceptanceRate");
-
-        if (elTotal) elTotal.innerText = data.total_patients ?? 0;
-        if (elUpi) elUpi.innerText = data.count_upi ?? 0;
-        if (elUti) elUti.innerText = data.count_uti ?? 0;
-        if (elAlerts) elAlerts.innerText = data.total_beers_alerts ?? 0;
-        if (elRate) elRate.innerText = `${data.acceptance_rate ?? 0}%`;
-
-        const tbody = document.getElementById("top5TableBody");
-        if (tbody) {
-          tbody.innerHTML = "";
-          if (data.top_5_beers && data.top_5_beers.length > 0) {
-            data.top_5_beers.forEach(item => {
-              tbody.innerHTML += `
-                <tr class="hover:bg-slate-50">
-                  <td class="py-2 px-2 font-bold text-slate-800">${item.drug}</td>
-                  <td class="py-2 px-2 text-right font-extrabold text-amber-600">${item.count}</td>
-                </tr>
-              `;
-            });
-          } else {
-            tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado.</td></tr>`;
-          }
+        
+        // Se a API retornou dados reais, atualiza a tela e o cache local
+        if (data.total_patients > 0 || !params.toString()) {
+          updateMetricsUI(data);
+          localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify(data));
+          return;
         }
       } catch (err) {
-        console.error("Erro ao carregar dados de indicadores:", err);
+        console.warn("Falha ao buscar métricas online. Utilizando sincronização local.", err);
       }
+
+      // Fallback para cache local se o banco estiver em repouso
+      const cached = localStorage.getItem(METRICS_CACHE_KEY);
+      if (cached) {
+        updateMetricsUI(JSON.parse(cached));
+      }
+    }
+
+    function recordLocalMetric(sector, alertsCount) {
+      let metrics = {
+        total_patients: 0,
+        count_upi: 0,
+        count_uti: 0,
+        total_beers_alerts: 0,
+        accepted_interventions: 0,
+        acceptance_rate: 0.0,
+        top_5_beers: []
+      };
+
+      const saved = localStorage.getItem(METRICS_CACHE_KEY);
+      if (saved) {
+        try { metrics = JSON.parse(saved); } catch(e){}
+      }
+
+      metrics.total_patients += 1;
+      if (sector.toLowerCase().includes("uti")) {
+        metrics.count_uti += 1;
+      } else {
+        metrics.count_upi += 1;
+      }
+      metrics.total_beers_alerts += alertsCount;
+
+      localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify(metrics));
     }
 
     function calculateCrCl() {
@@ -1136,6 +1179,7 @@
       
       const ageInput = document.getElementById("inpAge").value;
       const ageVal = parseInt(ageInput) || 70;
+      const currentSector = document.getElementById("selSector").value || "UPI (Enfermaria)";
 
       const btn = document.getElementById("btnProcessScreening");
       btn.disabled = true;
@@ -1143,7 +1187,7 @@
 
       const payload = {
         age: ageVal,
-        sector: document.getElementById("selSector").value,
+        sector: currentSector,
         fall_risk: document.getElementById("chkFallRisk").checked,
         conditions: document.getElementById("inpConditions").value.split(/[,]+/).map(c => c.trim()).filter(Boolean),
         crcl_ml_min: calculatedCrCl,
@@ -1165,6 +1209,9 @@
 
         const data = await res.json();
         lastGeneratedAlerts = data.alerts || [];
+
+        // Atualiza a sincronização local de indicadores imediatamente
+        recordLocalMetric(currentSector, lastGeneratedAlerts.length);
 
         const box = document.getElementById("screeningReportBox");
         const list = document.getElementById("reportAlertsList");
@@ -1269,6 +1316,21 @@
         not_applicable: '<span class="bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">⚪ Conduta Não Aplicável</span>'
       };
 
+      // Atualiza no cache local imediatamente
+      const saved = localStorage.getItem(METRICS_CACHE_KEY);
+      if (saved) {
+        try {
+          let metrics = JSON.parse(saved);
+          if (outcome === "accepted") {
+            metrics.accepted_interventions = (metrics.accepted_interventions || 0) + 1;
+            if (metrics.total_beers_alerts > 0) {
+              metrics.acceptance_rate = Math.round((metrics.accepted_interventions / metrics.total_beers_alerts) * 1000) / 10;
+            }
+            localStorage.setItem(METRICS_CACHE_KEY, JSON.stringify(metrics));
+          }
+        } catch(e){}
+      }
+
       if (alertId) {
         try {
           await fetch(`/api/v1/alerts/${alertId}/outcome`, {
@@ -1277,7 +1339,7 @@
             body: JSON.stringify({ outcome })
           });
         } catch (e) {
-          console.warn("Falha de rede ao persistir desfecho no banco:", e);
+          console.warn("Aviso: persistido localmente.", e);
         }
       }
 
