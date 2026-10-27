@@ -4,9 +4,10 @@ import unicodedata
 
 # =====================================================================
 # 1. DICIONÁRIO MESTRE DE DROGAS (AGS Beers 2023 + ACB)
+# Total: 49 Princípios Ativos de Alto Risco mapeados.
 # =====================================================================
 BEERS_DRUGS = {
-    # --- SNC e Anticonvulsivantes ---
+    # 1. SNC e Anticonvulsivantes
     "fenobarbital": ["fenobarbital", "gardenal", "fenocris", "edhanol"],
     "fenitoina": ["fenitoina", "hidantal", "epamin"],
     "diazepam": ["diazepam", "valium", "compaz", "diazepax"],
@@ -18,7 +19,7 @@ BEERS_DRUGS = {
     "carbamazepina": ["carbamazepina", "tegretol"],
     "acido valproico": ["acido valproico", "valproato", "depakene", "depakote"],
 
-    # --- Anticolinérgicos e Anti-histamínicos ---
+    # 2. Anticolinérgicos e Anti-histamínicos
     "prometazina": ["prometazina", "fenergan"],
     "dimenidrinato": ["dimenidrinato", "dramin", "nausicalm"],
     "dexclorfeniramina": ["dexclorfeniramina", "polaramine", "histamin"],
@@ -27,7 +28,7 @@ BEERS_DRUGS = {
     "amitriptilina": ["amitriptilina", "tryptanol", "amytril"],
     "nortriptilina": ["nortriptilina", "pamelor"],
 
-    # --- Analgésicos, Opioides e Relaxantes Musculares ---
+    # 3. Analgésicos, Opioides e Relaxantes Musculares
     "ciclobenzaprina": ["ciclobenzaprina", "miosan", "musculare"],
     "orfenadrina": ["orfenadrina", "dorflex"],
     "carisoprodol": ["carisoprodol", "torsilax", "tandrilax"],
@@ -35,7 +36,7 @@ BEERS_DRUGS = {
     "tramadol": ["tramadol", "tramal", "sylador"],
     "codeina": ["codeina", "tylex", "paco"],
 
-    # --- AINEs ---
+    # 4. AINEs
     "cetoprofeno": ["cetoprofeno", "profenid", "biprofenid"],
     "diclofenaco": ["diclofenaco", "voltaren", "cataflam", "flotac"],
     "ibuprofeno": ["ibuprofeno", "alivium", "advil"],
@@ -44,7 +45,7 @@ BEERS_DRUGS = {
     "cetorolaco": ["cetorolaco", "toragesic", "trometamol"],
     "meloxicam": ["meloxicam", "bioflex", "movatec"],
 
-    # --- Cardiovasculares e Renais ---
+    # 5. Cardiovasculares e Renais
     "clonidina": ["clonidina", "atensina"],
     "doxazosina": ["doxazosina", "cardura"],
     "metildopa": ["metildopa", "aldomet"],
@@ -54,7 +55,7 @@ BEERS_DRUGS = {
     "enoxaparina": ["enoxaparina", "clexane", "versa"],
     "varfarina": ["varfarina", "marevan", "coumadin"],
 
-    # --- Endocrinologia e TGI ---
+    # 6. Endocrinologia e TGI
     "glibenclamida": ["glibenclamida", "daonil"],
     "glimepirida": ["glimepirida", "amaryl"],
     "metoclopramida": ["metoclopramida", "plasil"],
@@ -62,7 +63,7 @@ BEERS_DRUGS = {
     "omeprazol": ["omeprazol", "losec", "peptazol"],
     "pantoprazol": ["pantoprazol", "pantocal"],
 
-    # --- Antipsicóticos ---
+    # 7. Antipsicóticos
     "risperidona": ["risperidona", "risperdal"],
     "quetiapina": ["quetiapina", "seroquel"],
     "haloperidol": ["haloperidol", "haldol"],
@@ -70,7 +71,9 @@ BEERS_DRUGS = {
     "clorpromazina": ["clorpromazina", "amplictil"]
 }
 
-# Dicionário ACB Score
+# =====================================================================
+# ESCORE ACB (Gera pontuação paralela independente)
+# =====================================================================
 ACB_SCORES = {
     "amitriptilina": 3, "prometazina": 3, "escopolamina": 3, "dimenidrinato": 3,
     "dexclorfeniramina": 3, "hidroxizina": 3, "clorpromazina": 3, "olanzapina": 3,
@@ -79,17 +82,15 @@ ACB_SCORES = {
 }
 
 # =====================================================================
-# 2. FUNÇÕES DE PROCESSAMENTO
+# FUNÇÕES DE PROCESSAMENTO
 # =====================================================================
 def normalize_text(text: str) -> str:
-    if not text:
-        return ""
+    if not text: return ""
     nfkd_form = unicodedata.normalize('NFKD', text)
     return nfkd_form.encode('ASCII', 'ignore').decode('utf-8').lower()
 
 def identify_drug_canonical(drug_name: str) -> str:
-    if not drug_name:
-        return ""
+    if not drug_name: return ""
     normalized_input = normalize_text(drug_name)
     for generic, synonyms in BEERS_DRUGS.items():
         for syn in synonyms:
@@ -108,7 +109,7 @@ def detect_drugs_in_prescription(prescription_text: str) -> list:
     return detected_drugs
 
 # =====================================================================
-# 3. MOTOR CLÍNICO: TODAS AS DROGAS MAPEADAS
+# 3. MOTOR CLÍNICO: MAPA EXAUSTIVO DAS 49 DROGAS (BLINDADO)
 # =====================================================================
 def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, crcl=None):
     alerts = []
@@ -116,7 +117,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
     med_tag_map = {}
     
     if conditions is None: conditions = []
-
     if age < 65:
         return alerts, acb_total, "Idade inferior a 65 anos. Triagem geriátrica não aplicável.", med_tag_map
 
@@ -132,102 +132,140 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
 
         is_sos = med.get("is_sos", False)
 
-        # 1. ESCORE ACB (Calcula pontos e avisa)
+        # PARTE A: GERAÇÃO DO ESCORE ACB (Se aplicável)
         if canonical in ACB_SCORES:
             score = ACB_SCORES[canonical]
             acb_total += score
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "ACB Score (Carga Anticolinérgica)",
-                "recommendation": f"Pontua {score} no ACB Score. Risco de delirium, boca seca e bexigoma.",
-                "rationale": "Depleção colinérgica agrava o declínio cognitivo em idosos.",
+                "recommendation": f"Pontua {score} no Escore ACB. Risco de delirium, boca seca e retenção urinária.",
+                "rationale": "A depleção colinérgica está ligada ao declínio cognitivo agudo e crônico.",
                 "tapering": "Considerar desprescrição ou substituição.",
                 "is_sos": is_sos,
                 "acb_score": score
             })
-            med_tag_map[canonical] = "Carga Anticolinérgica"
 
-        # 2. SISTEMA NERVOSO CENTRAL E ANTICONVULSIVANTES
-        if canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
+        # PARTE B: REGRAS ESTRITAS DE BEERS (Garante que as 49 drogas disparem alerta)
+        
+        # GRUPO 1: ANTICOLINÉRGICOS FORTES (Tabela 2)
+        if canonical in ["prometazina", "dimenidrinato", "dexclorfeniramina", "hidroxizina", "escopolamina", "amitriptilina", "nortriptilina"]:
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2",
+                "recommendation": "Altamente Anticolinérgico. Evitar uso.",
+                "rationale": "Comprometimento do clearance renal do idoso potencializa toxicidade no SNC (delirium e alucinações).",
+                "tapering": "Substituir por anti-histamínicos de 2ª geração ou suspender.",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Alto Risco Anticolinérgico"
+
+        # GRUPO 2: BENZODIAZEPÍNICOS, DROGAS Z E BARBITÚRICOS
+        elif canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
             snc_depressants.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso. Elevado risco de sedação prolongada, quedas e fraturas.",
-                "rationale": "Idosos têm hipersensibilidade GABAérgica e meia-vida prolongada.",
-                "tapering": "Redução gradual (25% a cada 7-14 dias).",
+                "recommendation": "Evitar prescrição. Elevado risco de ataxia, síncope e fratura de fêmur.",
+                "rationale": "Hipersensibilidade de receptores GABA e aumento da meia-vida em tecido adiposo.",
+                "tapering": "Redução gradual de 25% da dose a cada 7-14 dias. Não suspender abruptamente.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Queda/SNC"
 
+        # GRUPO 3: FENITOÍNA
         elif canonical == "fenitoina":
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2 / Janela Estreita",
-                "recommendation": "Evitar uso. Risco elevado de ataxia e toxicidade neurológica.",
-                "rationale": "Cinética não linear e forte dependência de albumina sérica.",
-                "tapering": "Avaliar substituição. Monitorar nível sérico livre se uso obrigatório.",
+                "recommendation": "Evitar uso se houver alternativa. Risco elevado de toxicidade neurológica central.",
+                "rationale": "Idosos têm menor albumina sérica; a fração livre e tóxica da fenitoína aumenta drasticamente.",
+                "tapering": "Monitorar nível sérico livre. Avaliar transição para Levetiracetam.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Tox. Neurológica"
 
+        # GRUPO 4: OUTROS ANTICONVULSIVANTES E ESTABILIZADORES
         elif canonical in ["carbamazepina", "acido valproico"]:
             snc_depressants.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
-                "axis": "AGS Beers 2023 - SNC / Psiquiatria",
-                "recommendation": "Usar com extrema cautela. Risco de hiponatremia (SIADH) e quedas.",
-                "rationale": "Fármacos com interações hepáticas complexas e potencial sedativo.",
-                "tapering": "Monitorar sódio sérico e reflexos motores.",
+                "axis": "AGS Beers 2023 - Alerta Geriátrico",
+                "recommendation": "Usar com cautela. Monitorar interações hepáticas severas e quedas.",
+                "rationale": "Risco de SIADH (hiponatremia induzida), tremor e parkinsonismo secundário.",
+                "tapering": "Dosar sódio sérico e evitar polifarmácia concomitante.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco SNC/SIADH"
 
-        # 3. RELAXANTES MUSCULARES FORTES
+        # GRUPO 5: RELAXANTES MUSCULARES
         elif canonical in ["ciclobenzaprina", "orfenadrina", "carisoprodol"]:
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar. Risco severo de toxicidade anticolinérgica e sedação.",
-                "rationale": "Baixa tolerabilidade em idosos (fraqueza, delirium e quedas).",
-                "tapering": "Suspender. Preferir analgesia simples (Dipirona/Paracetamol).",
+                "recommendation": "Evitar. Tolerabilidade extremamente pobre em geriatria.",
+                "rationale": "Efeitos adversos anticolinérgicos e sedativos profundos superam a analgesia.",
+                "tapering": "Suspender. Preferir analgesia simples ou compressas.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Relaxante Muscular Inadequado"
 
-        # 4. AINES E OPIOIDES
+        # GRUPO 6: AINEs
         elif canonical in ["cetoprofeno", "diclofenaco", "ibuprofeno", "naproxeno", "nimesulida", "cetorolaco", "meloxicam"]:
             nsaids.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar. Risco de Lesão Renal Aguda e Hemorragia Digestiva.",
-                "rationale": "A inibição de prostaglandinas gera vasoconstrição da arteríola aferente renal.",
-                "tapering": "Suspender imediatamente.",
+                "recommendation": "Evitar uso, principalmente crônico. Risco grave de HDA e Lesão Renal Aguda.",
+                "rationale": "Inibição de COX afeta diretamente a barreira mucosa e a perfusão glomerular.",
+                "tapering": "Suspender imediatamente. Substituir por Paracetamol ou opioide fraco.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Renal/HDA"
 
-        elif canonical in ["tramadol", "codeina"]:
+        # GRUPO 7: OPIOIDES (Inclui alerta obrigatório de renal para morfina)
+        elif canonical in ["morfina", "tramadol", "codeina"]:
             snc_depressants.append(canonical)
-            alerts.append({
-                "drug": canonical.capitalize(),
-                "axis": "Alerta Geriátrico - SNC",
-                "recommendation": "Usar com cautela. Pode causar constipação severa, tontura e delirium.",
-                "rationale": "Idosos são mais sensíveis aos efeitos centrais e gastrointestinais dos opioides.",
-                "tapering": "Usar menor dose efetiva e prescrever laxante profilático se contínuo.",
-                "is_sos": is_sos
-            })
-            med_tag_map[canonical] = "Opioide/SNC"
+            if canonical == "morfina":
+                if crcl is not None and crcl < 30:
+                    alerts.append({
+                        "drug": canonical.capitalize(),
+                        "axis": "AGS Beers 2023 - Tabela 6 (Renal Crítico)",
+                        "recommendation": f"Suspender ou Evitar. CrCl {crcl} mL/min. Risco de coma.",
+                        "rationale": "Acúmulo de M3G/M6G por falha renal causa neurotoxicidade e depressão respiratória.",
+                        "tapering": "Substituir por Fentanila ou Metadona (metabolismo hepático).",
+                        "is_sos": is_sos
+                    })
+                    med_tag_map[canonical] = "Ajuste Renal Crítico"
+                else:
+                    alerts.append({
+                        "drug": canonical.capitalize(),
+                        "axis": "Atenção Geriátrica - Função Renal",
+                        "recommendation": "Exige monitoramento renal estrito. Droga neurotóxica se CrCl < 30.",
+                        "rationale": "Metabólitos ativos acumulam-se rapidamente na disfunção renal do idoso.",
+                        "tapering": "Se CrCl desconhecido, solicitar exame antes da manutenção da droga.",
+                        "is_sos": is_sos
+                    })
+                    med_tag_map[canonical] = "Risco Opioide/Renal"
+            else:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "Atenção Geriátrica - Opioide",
+                    "recommendation": "Monitorar sedação, tontura e garantir protocolo de constipação.",
+                    "rationale": "Queda da motilidade intestinal e limiar rebaixado para confusão mental.",
+                    "tapering": "Usar a menor dose possível. Associar macrogol se uso regular.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Opioide/SNC"
 
-        # 5. CARDIOVASCULARES
-        elif canonical in ["clonidina", "metildopa", "doxazosina"]:
+        # GRUPO 8: ALFA-AGONISTAS E CARDIO
+        elif canonical in ["clonidina", "doxazosina", "metildopa"]:
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso como anti-hipertensivo de rotina.",
-                "rationale": "Alto risco de hipotensão ortostática, bradicardia e síncope ao levantar-se.",
-                "tapering": "Desmame gradual (Clonidina causa rebote hipertensivo se suspensa subitamente).",
+                "recommendation": "Evitar como anti-hipertensivo de rotina.",
+                "rationale": "Alto risco de hipotensão ortostática grave, bradicardia e síncope.",
+                "tapering": "Desmame progressivo (Clonidina pode causar rebote fatal se parada subitamente).",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Ortostático"
@@ -237,8 +275,8 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
                 "recommendation": "Evitar como 1ª linha para Fibrilação Atrial.",
-                "rationale": "Alta toxicidade pulmonar, tireoidiana e tempo de meia-vida extremamente longo.",
-                "tapering": "Reavaliar necessidade de controle de ritmo vs. controle de frequência.",
+                "rationale": "Toxicidade orgânica múltipla (pulmão, tireoide, fígado) e meia-vida de meses.",
+                "tapering": "Avaliar controle de frequência no lugar de ritmo.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Tox. Cumulativa"
@@ -247,34 +285,90 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar doses > 0,125 mg/dia.",
-                "rationale": "Redução do volume de distribuição (sarcopenia) e da depuração renal causam intoxicação fácil.",
-                "tapering": "Monitorar função renal, potássio e nível sérico.",
+                "recommendation": "Evitar uso de doses maiores que 0,125 mg/dia.",
+                "rationale": "Janela terapêutica super estreita associada a menor clearance renal geriátrico.",
+                "tapering": "Monitorar função renal e K+.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Janela Estreita"
 
-        # 6. ANTIPSICÓTICOS
-        elif canonical in ["risperidona", "quetiapina", "haloperidol", "olanzapina", "clorpromazina"]:
-            snc_depressants.append(canonical)
+        # GRUPO 9: RENAL EXCLUSIVO (Espironolactona e Enoxaparina)
+        elif canonical == "espironolactona":
+            if crcl is not None and crcl < 30:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
+                    "recommendation": f"Evitar uso com CrCl {crcl} mL/min. Risco de parada cardíaca por hipercalemia.",
+                    "rationale": "Inibição de K+ tubular sem depuração glomerular agrava hipercalemia rapidamente.",
+                    "tapering": "Suspender droga imediatamente.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal Crítico"
+            else:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "Alerta Geriátrico - Risco Renal",
+                    "recommendation": "Uso condicionado ao Clearance de Creatinina (Evitar se CrCl < 30).",
+                    "rationale": "Medicamento fatal se houver declínio renal agudo despercebido.",
+                    "tapering": "Garantir medição de eletrólitos antes da dose.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Risco Hipercalemia"
+
+        elif canonical == "enoxaparina":
+            anticoagulants.append(canonical)
+            if crcl is not None and crcl < 30:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
+                    "recommendation": f"Disfunção renal (CrCl {crcl}). Ajuste obrigatório (Ex: Profilaxia para 20mg/dia).",
+                    "rationale": "Sem filtração glomerular, o fármaco acumula no sangue gerando hemorragia maciça.",
+                    "tapering": "Ajustar dose ou transicionar para Heparina Não Fracionada (HNF).",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal Crítico"
+            else:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "Alerta Geriátrico - Risco Renal",
+                    "recommendation": "Uso condicionado ao Clearance. Exige ajuste se CrCl < 30.",
+                    "rationale": "Sem função renal confirmada, a heparina acumula no idoso.",
+                    "tapering": "Garantir o cálculo Cockcroft-Gault antes de manter prescrição plena.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal"
+
+        elif canonical == "varfarina":
+            anticoagulants.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
-                "axis": "AGS Beers 2023 - Tabela 2 (Antipsicóticos)",
-                "recommendation": "Evitar uso para problemas comportamentais em demência (se não houver risco físico).",
-                "rationale": "Aumenta risco de AVC, declínio cognitivo e mortalidade (Black Box Warning).",
-                "tapering": "Desmame gradual. Usar doses mínimas apenas no delirium hiperativo grave.",
+                "axis": "Janela Estreita / Interações",
+                "recommendation": "Alto risco hemorrágico em idosos polimedicados e desnutridos.",
+                "rationale": "Sofre interferência direta de hipoalbuminemia e inibidores da CYP450.",
+                "tapering": "Controle estrito de RNI (INR).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco AVC/Mortalidade"
+            med_tag_map[canonical] = "Risco Hemorragia"
 
-        # 7. GASTROINTESTINAL E ENDOCRINO
+        # GRUPO 10: ENDÓCRINO E TGI
+        elif canonical in ["glibenclamida", "glimepirida"]:
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2",
+                "recommendation": "Evitar prescrição. Risco de hipoglicemia severa e letal.",
+                "rationale": "Ação prolongada associada à falha da resposta adrenérgica no idoso (hipoglicemia não sentida).",
+                "tapering": "Substituir por Inibidor de DPP-4 (ex: Linagliptina).",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Risco Hipoglicemia"
+
         elif canonical == "metoclopramida":
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso, especialmente crônico.",
-                "rationale": "Risco elevado de efeitos extrapiramidais (parkinsonismo medicamentoso) e discinesia tardia.",
-                "tapering": "Substituir por Ondansetrona ou Domperidona.",
+                "recommendation": "Evitar, especialmente uso contínuo.",
+                "rationale": "Forte penetração no SNC causando parkinsonismo medicamentoso e discinesia tardia.",
+                "tapering": "Trocar por Ondansetrona ou Domperidona (menor penetração central).",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Extrapiramidal"
@@ -283,9 +377,9 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso como laxante.",
-                "rationale": "Alto risco de aspiração e pneumonia lipoídica em idosos com disfagia.",
-                "tapering": "Substituir por Macrogol (PEG 4000) ou Lactulose.",
+                "recommendation": "Evitar uso oral para constipação.",
+                "rationale": "Elevado risco de pneumonia lipoídica silenciosa por microaspiração.",
+                "tapering": "Substituir por laxantes osmóticos (Macrogol ou Lactulose).",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Aspiração"
@@ -294,69 +388,34 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso ininterrupto por > 8 semanas sem indicação clara (ex: HDA, esôfago de Barrett).",
-                "rationale": "Risco de infecção por C. difficile, perda óssea e má absorção de vitamina B12/Magnésio.",
-                "tapering": "Reduzir dose em 50% ou passar para dias alternados até suspender.",
+                "recommendation": "Evitar uso > 8 semanas sem justificativa formal (HDA prévia, esofagite grave).",
+                "rationale": "Supressão ácida causa fraturas osteoporóticas, deficiência de B12 e infecção por C. difficile.",
+                "tapering": "Reduzir 50% da dose ou espaçar para dias alternados até suspensão.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Uso Crônico Indevido"
 
-        # 8. AJUSTES RENAIS ESTABELECIDOS (Tabela 6)
-        if crcl is not None:
-            if canonical == "enoxaparina" and crcl < 30:
-                anticoagulants.append(canonical)
-                alerts.append({
-                    "drug": canonical.capitalize(),
-                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
-                    "recommendation": f"Função renal comprometida (CrCl {crcl} mL/min). Reduzir profilaxia para 20mg/dia.",
-                    "rationale": "Risco de sangramento por acúmulo de fator anti-Xa.",
-                    "tapering": "Adequar à taxa de filtração.",
-                    "is_sos": is_sos
-                })
-                med_tag_map[canonical] = "Ajuste Renal"
-
-            if canonical == "espironolactona" and crcl < 30:
-                alerts.append({
-                    "drug": canonical.capitalize(),
-                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
-                    "recommendation": f"Evitar uso com CrCl {crcl} mL/min.",
-                    "rationale": "Risco iminente de hipercalemia fatal.",
-                    "tapering": "Suspender e monitorar K+ sérico.",
-                    "is_sos": is_sos
-                })
-                med_tag_map[canonical] = "Ajuste Renal"
-
-            if canonical == "morfina" and crcl < 30:
-                alerts.append({
-                    "drug": canonical.capitalize(),
-                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
-                    "recommendation": f"Evitar uso com CrCl {crcl} mL/min.",
-                    "rationale": "Acúmulo de neurotoxinas (M3G/M6G) causa mioclonias e coma.",
-                    "tapering": "Substituir por Fentanila.",
-                    "is_sos": is_sos
-                })
-                med_tag_map[canonical] = "Ajuste Renal"
-
-        if canonical == "varfarina":
-            anticoagulants.append(canonical)
+        # GRUPO 11: ANTIPSICÓTICOS
+        elif canonical in ["risperidona", "quetiapina", "haloperidol", "olanzapina", "clorpromazina"]:
+            snc_depressants.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
-                "axis": "Janela Estreita / Sangramento",
-                "recommendation": "Vigilância extrema de RNI.",
-                "rationale": "Hipoalbuminemia aumenta fração livre e eleva risco hemorrágico.",
-                "tapering": "Garantir interações avaliadas.",
+                "axis": "AGS Beers 2023 - Tabela 2 (Antipsicóticos)",
+                "recommendation": "Evitar como rotina para insônia ou agitação demencial leve.",
+                "rationale": "Black Box Warning: triplica risco de AVC isquêmico e morte súbita em idosos com demência.",
+                "tapering": "Usar apenas no delirium grave (menor dose/tempo). Desmamar o quanto antes.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Sangramento"
+            med_tag_map[canonical] = "Risco AVC/Mortalidade"
 
-    # 9. REGRAS DE INTERAÇÃO (Tabela 4)
+    # PARTE C: AVALIAÇÃO DE INTERAÇÕES SINÉRGICAS (Tabela 4)
     if len(snc_depressants) >= 2:
         alerts.append({
             "drug": "Múltiplos Depressores do SNC",
             "axis": "AGS Beers 2023 - Tabela 4",
-            "recommendation": f"Prescrição simultânea de 2 ou mais sedativos: {', '.join(snc_depressants)}.",
-            "rationale": "Efeito sinérgico letal (quedas, depressão respiratória e delirium).",
-            "tapering": "Desprescrever o menos essencial.",
+            "recommendation": f"Uso simultâneo de {len(snc_depressants)} sedativos ({', '.join(snc_depressants)}).",
+            "rationale": "O efeito central se multiplica, gerando parada respiratória, quedas e delirium irreversível.",
+            "tapering": "Escolher a droga de menor prioridade e iniciar desprescrição imediata.",
             "is_sos": False
         })
     
@@ -364,17 +423,17 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
         alerts.append({
             "drug": "AINE + Anticoagulante",
             "axis": "AGS Beers 2023 - Tabela 4",
-            "recommendation": "Uso concomitante severamente contraindicado.",
-            "rationale": "Risco catastrófico de Hemorragia Digestiva.",
-            "tapering": "Suspender AINE.",
+            "recommendation": "ALERTA CRÍTICO: Uso concomitante aumenta severamente risco de sangramento.",
+            "rationale": "Inibição de plaquetas (AINE) e bloqueio da coagulação somam-se à corrosão gástrica.",
+            "tapering": "Suspender AINE imediatamente.",
             "is_sos": False
         })
 
-    # Interpretação ACB
+    # PARTE D: FECHAMENTO ACB
     acb_text = "Carga Nula ou Leve. Risco controlado."
     if acb_total >= 3:
-        acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo e delirium."
+        acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo, delirium e retenção periférica."
     elif acb_total in [1, 2]:
-        acb_text = f"Carga Moderada (Score {acb_total}). Vigiar retenção urinária e confusão mental."
+        acb_text = f"Carga Moderada (Score {acb_total}). Vigiar queixas de constipação e confusão mental."
 
     return alerts, acb_total, acb_text, med_tag_map
