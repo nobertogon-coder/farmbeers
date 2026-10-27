@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
+# IMPORTAÇÃO CRÍTICA DO CÉREBRO CLÍNICO
 import clinical_rules
 
 # ==============================================================================
@@ -268,7 +269,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS DA CFT - CONTAGEM RIGOROSA E EXCLUSIVA POR SETOR
+# ROTA DE MÉTRICAS DA CFT
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(
@@ -296,7 +297,6 @@ def get_metrics(
 
         total_patients = len(screenings)
         
-        # Contagem mutuamente exclusiva: se for UTI conta UTI, caso contrário é UPI
         count_uti = 0
         count_upi = 0
         for s in screenings:
@@ -382,13 +382,11 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
     persisted_records = []
     
-    # GRAVAÇÃO APENAS SE persist == True (quando clica em Processar Triagem)
     if payload.medications and payload.persist:
         try:
             sec_val = str(payload.sector) if payload.sector else "UPI (Enfermaria)"
             crcl_val = float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None
 
-            # Cria APENAS 1 registro de paciente
             record = ScreeningRecord(
                 pharmacist_username="admin",
                 sector=sec_val,
@@ -402,7 +400,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(record)
 
-            # Grava os alertas vinculados àquele único paciente
             for a in alerts_raw:
                 d_name = str(a.get("drug") or a.get("drug_name") or "Medicamento")
                 alert_rec = ScreeningAlertRecord(
@@ -441,17 +438,18 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
     med_rows = []
     for m in payload.medications:
-        canonical = clinical_rules.identify_drug_canonical(m.name)
-        matched = None
-        if canonical:
-            c_key = canonical.strip().lower()
-            if c_key in alert_by_canonical:
-                matched = alert_by_canonical[c_key]
-            else:
-                for k, v in alert_by_canonical.items():
-                    if k in c_key or c_key in k:
-                        matched = v
-                        break
+        # Usa a mesma função de normalização do clinical_rules para identificar se é alvo
+        canonical_name = ""
+        normalized_m_name = clinical_rules.normalize_text(m.name)
+        for gen_name, synonyms in clinical_rules.BEERS_DRUGS.items():
+            for syn in synonyms:
+                if clinical_rules.normalize_text(syn) in normalized_m_name:
+                    canonical_name = gen_name
+                    break
+            if canonical_name:
+                break
+        
+        matched = alert_by_canonical.get(canonical_name) if canonical_name else None
 
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
@@ -463,15 +461,15 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         tag_str = ""
         is_beers = False
 
-        if canonical and canonical in med_tag_map:
-            tag_str = med_tag_map[canonical]
+        if canonical_name and canonical_name in med_tag_map:
+            tag_str = med_tag_map[canonical_name]
             is_beers = True
         elif matched:
             tag_str = matched.get("axis", "AGS Beers 2023")
             is_beers = True
 
         med_rows.append({
-            "name": m.name,
+            "name": canonical_name.capitalize() if canonical_name else m.name,
             "dose_route": dose_route_str,
             "is_beers": is_beers,
             "is_sos": is_sn_flag,
@@ -487,7 +485,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR VIA REGEX
+# EXTRAÇÃO DE PDF HOSPITALAR USANDO A NOVA LÓGICA DO CLINICAL_RULES
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
@@ -527,42 +525,54 @@ async def extract_pdf(file: UploadFile = File(...)):
     contents = await file.read()
     extracted_items = []
     seen = set()
+    
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
+            texto_completo = ""
             for page in pdf.pages:
                 text = page.extract_text()
-                if not text:
+                if text:
+                    texto_completo += text + "\n"
+
+            if not texto_completo.strip():
+                raise ValueError("Nenhum texto extraído do PDF.")
+
+            # PASSO 1: Encontra QUAIS drogas de risco estão no PDF inteiro usando a nova função
+            medicamentos_detectados = clinical_rules.detect_drugs_in_prescription(texto_completo)
+            
+            # PASSO 2: Varre linha por linha para tentar capturar a posologia dessas drogas detectadas
+            for line in texto_completo.split("\n"):
+                line_clean = line.strip()
+                if not line_clean:
                     continue
-                for line in text.split("\n"):
-                    line_clean = line.strip()
-                    if not line_clean:
-                        continue
-                    matched = clinical_rules.identify_drug_canonical(line_clean)
-                    if matched and matched not in seen:
-                        seen.add(matched)
+                
+                normalized_line = clinical_rules.normalize_text(line_clean)
+                
+                # Para cada droga que sabemos que existe no PDF, procuramos em qual linha ela está
+                for generic_name in medicamentos_detectados:
+                    if generic_name in seen:
+                        continue # Já pegou essa droga
+                        
+                    synonyms = clinical_rules.BEERS_DRUGS.get(generic_name, [])
+                    found_in_line = False
+                    
+                    for syn in synonyms:
+                        clean_syn = clinical_rules.normalize_text(syn)
+                        if clean_syn in normalized_line:
+                            found_in_line = True
+                            break
+                            
+                    if found_in_line:
+                        seen.add(generic_name)
                         dose, route, freq, is_sn = extract_posology_details(line_clean)
                         extracted_items.append({
-                            "name": matched.capitalize(),
+                            "name": generic_name.capitalize(),
                             "dose": dose,
                             "route": route,
                             "frequency": freq,
                             "is_sos": is_sn
                         })
-                    else:
-                        for w in line_clean.split():
-                            w_clean = w.strip(".,;:()[]{}")
-                            if len(w_clean) >= 4:
-                                m_word = clinical_rules.identify_drug_canonical(w_clean)
-                                if m_word and m_word not in seen:
-                                    seen.add(m_word)
-                                    dose, route, freq, is_sn = extract_posology_details(line_clean)
-                                    extracted_items.append({
-                                        "name": m_word.capitalize(),
-                                        "dose": dose,
-                                        "route": route,
-                                        "frequency": freq,
-                                        "is_sos": is_sn
-                                    })
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
 
