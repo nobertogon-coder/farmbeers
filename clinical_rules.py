@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
 import re
 import unicodedata
 
 # =====================================================================
-# 1. DICIONÁRIO MESTRE DE DROGAS (Critérios de Beers AGS 2023 + ACB)
-# Mapeia o Princípio Ativo (Genérico) para todos os seus sinônimos
+# 1. DICIONÁRIO MESTRE DE DROGAS (AGS Beers 2023 + ACB)
+# Mapeia o Genérico para todos os seus sinônimos/nomes comerciais
 # =====================================================================
 BEERS_DRUGS = {
     # --- SNC e Anticonvulsivantes ---
@@ -51,7 +52,7 @@ BEERS_DRUGS = {
     "amiodarona": ["amiodarona", "ancoron", "atlansil"],
     "digoxina": ["digoxina", "lanoxin"],
     "espironolactona": ["espironolactona", "aldactone", "diempax"],
-    "enoxaparina": ["enoxaparina", "clexane", "versa", "heparina de baixo peso molecular"],
+    "enoxaparina": ["enoxaparina", "clexane", "versa"],
     "varfarina": ["varfarina", "marevan", "coumadin"],
 
     # --- Endocrinologia e Trato Gastrointestinal ---
@@ -70,68 +71,193 @@ BEERS_DRUGS = {
     "clorpromazina": ["clorpromazina", "amplictil"]
 }
 
-# =====================================================================
-# 2. FUNÇÕES DE PROCESSAMENTO E DETECÇÃO
-# =====================================================================
+# Dicionário de Pontuação de Carga Anticolinérgica (ACB Score)
+ACB_SCORES = {
+    "amitriptilina": 3, "prometazina": 3, "escopolamina": 3, "dimenidrinato": 3,
+    "dexclorfeniramina": 3, "hidroxizina": 3, "clorpromazina": 3, "olanzapina": 3,
+    "nortriptilina": 3, "carbamazepina": 2, "ciclobenzaprina": 2,
+    "risperidona": 1, "quetiapina": 1, "haloperidol": 1, "diazepam": 1, "alprazolam": 1
+}
 
+# =====================================================================
+# 2. FUNÇÕES DE PROCESSAMENTO TEXTUAL E IDENTIFICAÇÃO
+# =====================================================================
 def normalize_text(text: str) -> str:
-    """
-    Remove acentos, caracteres especiais e converte tudo para minúsculas.
-    Exemplo: "FENITOÍNA 100mg" -> "fenitoina 100mg"
-    """
+    """Remove acentos e converte para minúsculo"""
     if not text:
         return ""
-    
-    # Converte para string unicode normalizada e remove os acentos (diacríticos)
     nfkd_form = unicodedata.normalize('NFKD', text)
-    text_without_accents = nfkd_form.encode('ASCII', 'ignore').decode('utf-8')
-    
-    return text_without_accents.lower()
+    return nfkd_form.encode('ASCII', 'ignore').decode('utf-8').lower()
 
+def identify_drug_canonical(drug_name: str) -> str:
+    """Identifica o nome genérico a partir de qualquer sinônimo ou nome comercial."""
+    if not drug_name:
+        return ""
+    normalized_input = normalize_text(drug_name)
+    for generic, synonyms in BEERS_DRUGS.items():
+        for syn in synonyms:
+            if normalize_text(syn) in normalized_input:
+                return generic
+    return ""
 
 def detect_drugs_in_prescription(prescription_text: str) -> list:
-    """
-    Varre o texto extraído do PDF da prescrição e retorna uma lista com os 
-    nomes genéricos dos medicamentos de risco identificados.
-    """
+    """Busca os medicamentos de risco no texto extraído do PDF."""
     detected_drugs = []
-    
-    # 1. Normaliza o texto total do PDF (sem acentos e minúsculo)
     normalized_text = normalize_text(prescription_text)
     
-    # 2. Itera sobre o dicionário mestre
     for generic_name, synonyms in BEERS_DRUGS.items():
         for synonym in synonyms:
-            # Normaliza também o sinônimo por segurança
             clean_synonym = normalize_text(synonym)
-            
-            # Utiliza Regex com \b (Word Boundary) para buscar a palavra exata.
-            # Isso evita que a sílaba "dol" de um remédio acione "haloperidol", por exemplo.
-            pattern = rf"\b{re.escape(clean_synonym)}\b"
-            
-            if re.search(pattern, normalized_text):
+            if clean_synonym in normalized_text:
                 detected_drugs.append(generic_name)
-                # Se achou um sinônimo (ex: 'gardenal'), adiciona 'fenobarbital' na lista
-                # e interrompe o loop dos sinônimos para não duplicar o mesmo remédio.
-                break 
+                break
                 
     return detected_drugs
 
 # =====================================================================
-# 3. TESTE DE VALIDAÇÃO (Pode apagar ou comentar em produção)
+# 3. MOTOR CLÍNICO: AVALIAÇÃO BEERS E ACB SCORE
 # =====================================================================
-if __name__ == "__main__":
-    texto_pdf_simulado = """
-    HOSPITAL DE AERONÁUTICA DE RECIFE
-    PRESCRIÇÃO MÉDICA - LEITO 05
+def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, crcl=None):
+    alerts = []
+    acb_total = 0
+    med_tag_map = {}
     
-    1. Cefazolina 1g IV 8/8h
-    2. HIDANTAL 100mg IV 8/8h
-    3. FENOCRIS 100mg VO 12/12h
-    4. Rivotril 2mg VO SN
-    5. FENERGAN 25mg IV SN
-    """
+    if conditions is None:
+        conditions = []
+
+    # Se a idade for inferior a 65 anos, as regras geriátricas estritas não se aplicam
+    if age < 65:
+        return alerts, acb_total, "Idade inferior a 65 anos. Triagem geriátrica não aplicável.", med_tag_map
+
+    # Listas para verificar interações (Tabela 4)
+    snc_depressants = []
+    nsaids = []
+    anticoagulants = []
+
+    for med in medications:
+        raw_name = med.get("name", "")
+        canonical = identify_drug_canonical(raw_name)
+        if not canonical:
+            continue
+
+        is_sos = med.get("is_sos", False)
+
+        # 1. Cálculo da Carga Anticolinérgica (ACB)
+        if canonical in ACB_SCORES:
+            score = ACB_SCORES[canonical]
+            acb_total += score
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "ACB Score (Carga Anticolinérgica)",
+                "recommendation": f"Pontua {score} no ACB Score. Risco de delirium, boca seca, bexigoma e quedas.",
+                "rationale": "A depleção colinérgica agrava o declínio cognitivo em idosos.",
+                "tapering": "Considerar desprescrição ou substituição por alternativa não anticolinérgica.",
+                "is_sos": is_sos,
+                "acb_score": score
+            })
+            med_tag_map[canonical] = "Carga Anticolinérgica"
+
+        # 2. Regras da Tabela 2 (Evitar na maioria dos idosos)
+        if canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
+            snc_depressants.append(canonical)
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2",
+                "recommendation": "Evitar prescrição. Elevado risco de ataxia, síncope e fratura de fêmur.",
+                "rationale": "Hipersensibilidade de receptores GABA e aumento da meia-vida (fármaco lipofílico).",
+                "tapering": "Redução gradual de 25% da dose a cada 7 a 14 dias para evitar crise de abstinência.",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Risco Queda/SNC"
+
+        if canonical in ["glibenclamida", "glimepirida"]:
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2",
+                "recommendation": "Evitar prescrição. Risco de hipoglicemia severa e prolongada.",
+                "rationale": "Falência dos mecanismos contrarreguladores adrenérgicos no idoso (hipoglicemia assintomática).",
+                "tapering": "Substituir por Inibidor de DPP-4 (ex: Linagliptina) ou esquema de insulina seguro.",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Risco Hipoglicemia"
+
+        if canonical in ["cetoprofeno", "diclofenaco", "ibuprofeno", "naproxeno", "nimesulida", "cetorolaco", "meloxicam"]:
+            nsaids.append(canonical)
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2",
+                "recommendation": "Evitar uso. Risco de Hemorragia Digestiva e Lesão Renal Aguda.",
+                "rationale": "Inibição de prostaglandinas induz constrição da arteríola aferente (isquemia glomerular).",
+                "tapering": "Suspender. Substituir por Dipirona/Paracetamol fixo ou opioides fracos (Tramadol).",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Risco Renal/Gástrico"
+
+        # 3. Regras da Tabela 6 (Ajuste por Função Renal)
+        if crcl is not None:
+            if canonical == "enoxaparina" and crcl < 30:
+                anticoagulants.append(canonical)
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
+                    "recommendation": f"Função renal comprometida (CrCl {crcl} mL/min). Reduzir dose profilática para 20mg/dia.",
+                    "rationale": "Eliminação glomerular estrita. Risco de hemorragia grave por acúmulo de fator anti-Xa.",
+                    "tapering": "Adequar dose baseada na taxa de filtração.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal"
+
+            if canonical == "espironolactona" and crcl < 30:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
+                    "recommendation": f"Evitar uso com CrCl {crcl} mL/min. Risco elevado de hipercalemia fatal.",
+                    "rationale": "Inibição da excreção de potássio tubular sem capacidade de depuração glomerular.",
+                    "tapering": "Suspender prescrição e monitorar potássio sérico.",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal"
+
+            if canonical == "morfina" and crcl < 30:
+                alerts.append({
+                    "drug": canonical.capitalize(),
+                    "axis": "AGS Beers 2023 - Tabela 6 (Renal)",
+                    "recommendation": f"Evitar uso com CrCl {crcl} mL/min. Substituir analgésico.",
+                    "rationale": "Acúmulo de M3G e M6G causa neurotoxicidade (mioclonias) e depressão respiratória.",
+                    "tapering": "Substituir por Fentanila ou Metadona (metabolismo hepático em metabólitos inativos).",
+                    "is_sos": is_sos
+                })
+                med_tag_map[canonical] = "Ajuste Renal"
+
+        if canonical in ["varfarina"]:
+            anticoagulants.append(canonical)
+
+    # 4. Regras da Tabela 4 (Interações Sinérgicas Geriátricas)
+    if len(snc_depressants) >= 2:
+        alerts.append({
+            "drug": "Múltiplos Depressores do SNC",
+            "axis": "AGS Beers 2023 - Tabela 4",
+            "recommendation": f"Prescrição simultânea de 2 ou mais drogas no SNC: {', '.join(snc_depressants)}.",
+            "rationale": "Efeito sinérgico exponencial no risco de quedas e colapso respiratório.",
+            "tapering": "Eleger o medicamento menos essencial para desmame imediato.",
+            "is_sos": False
+        })
     
-    medicamentos_encontrados = detect_drugs_in_prescription(texto_pdf_simulado)
-    print(f"Medicamentos de Risco Detectados: {medicamentos_encontrados}")
-    # Resultado Esperado: ['fenobarbital', 'fenitoina', 'clonazepam', 'prometazina']
+    if len(nsaids) > 0 and len(anticoagulants) > 0:
+        alerts.append({
+            "drug": "AINE + Anticoagulante",
+            "axis": "AGS Beers 2023 - Tabela 4",
+            "recommendation": "Uso concomitante aumenta severamente risco de sangramento.",
+            "rationale": "Inibição plaquetária somada à depleção da mucosa gástrica e bloqueio da cascata de coagulação.",
+            "tapering": "Suspender AINE imediatamente.",
+            "is_sos": False
+        })
+
+    # Interpretação do Escore ACB
+    acb_text = "Carga Nula ou Leve. Risco controlado."
+    if acb_total >= 3:
+        acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo, delirium hospitalar e retenção periférica."
+    elif acb_total in [1, 2]:
+        acb_text = f"Carga Moderada (Score {acb_total}). Vigiar retenção urinária e confusão mental."
+
+    return alerts, acb_total, acb_text, med_tag_map
