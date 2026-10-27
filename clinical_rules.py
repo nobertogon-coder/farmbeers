@@ -1,119 +1,3 @@
-# -*- coding: utf-8 -*-
-import re
-import unicodedata
-
-# =====================================================================
-# 1. DICIONÁRIO MESTRE DE DROGAS (AGS Beers 2023 + ACB)
-# Mapeia o Genérico para todos os seus sinônimos/nomes comerciais
-# =====================================================================
-BEERS_DRUGS = {
-    # --- SNC e Anticonvulsivantes ---
-    "fenobarbital": ["fenobarbital", "gardenal", "fenocris", "edhanol"],
-    "fenitoina": ["fenitoina", "hidantal", "epamin"],
-    "diazepam": ["diazepam", "valium", "compaz", "diazepax"],
-    "clonazepam": ["clonazepam", "rivotril", "clonotril"],
-    "lorazepam": ["lorazepam", "lorax", "mesmerin"],
-    "midazolam": ["midazolam", "dormonid"],
-    "alprazolam": ["alprazolam", "frontal", "apraz"],
-    "zolpidem": ["zolpidem", "stilnox", "patz", "turner"],
-    "carbamazepina": ["carbamazepina", "tegretol"],
-    "acido valproico": ["acido valproico", "valproato", "depakene", "depakote"],
-
-    # --- Anticolinérgicos e Anti-histamínicos (ACB Score Alto) ---
-    "prometazina": ["prometazina", "fenergan"],
-    "dimenidrinato": ["dimenidrinato", "dramin", "nausicalm"],
-    "dexclorfeniramina": ["dexclorfeniramina", "polaramine", "histamin"],
-    "hidroxizina": ["hidroxizina", "hixizine"],
-    "escopolamina": ["escopolamina", "hioscina", "buscopan", "hyoscine"],
-    "amitriptilina": ["amitriptilina", "tryptanol", "amytril"],
-    "nortriptilina": ["nortriptilina", "pamelor"],
-
-    # --- Analgésicos, Opioides e Relaxantes Musculares ---
-    "ciclobenzaprina": ["ciclobenzaprina", "miosan", "musculare"],
-    "orfenadrina": ["orfenadrina", "dorflex"],
-    "carisoprodol": ["carisoprodol", "torsilax", "tandrilax"],
-    "morfina": ["morfina", "dimorf"],
-    "tramadol": ["tramadol", "tramal", "sylador"],
-    "codeina": ["codeina", "tylex", "paco"],
-
-    # --- Anti-inflamatórios Não Esteroides (AINEs) ---
-    "cetoprofeno": ["cetoprofeno", "profenid", "biprofenid"],
-    "diclofenaco": ["diclofenaco", "voltaren", "cataflam", "flotac"],
-    "ibuprofeno": ["ibuprofeno", "alivium", "advil"],
-    "naproxeno": ["naproxeno", "flanax"],
-    "nimesulida": ["nimesulida", "nisulid", "cimelide"],
-    "cetorolaco": ["cetorolaco", "toragesic", "trometamol"],
-    "meloxicam": ["meloxicam", "bioflex", "movatec"],
-
-    # --- Cardiovasculares e Renais ---
-    "clonidina": ["clonidina", "atensina"],
-    "doxazosina": ["doxazosina", "cardura"],
-    "metildopa": ["metildopa", "aldomet"],
-    "amiodarona": ["amiodarona", "ancoron", "atlansil"],
-    "digoxina": ["digoxina", "lanoxin"],
-    "espironolactona": ["espironolactona", "aldactone", "diempax"],
-    "enoxaparina": ["enoxaparina", "clexane", "versa"],
-    "varfarina": ["varfarina", "marevan", "coumadin"],
-
-    # --- Endocrinologia e Trato Gastrointestinal ---
-    "glibenclamida": ["glibenclamida", "daonil"],
-    "glimepirida": ["glimepirida", "amaryl"],
-    "metoclopramida": ["metoclopramida", "plasil"],
-    "oleo mineral": ["oleo mineral", "nujol"],
-    "omeprazol": ["omeprazol", "losec", "peptazol"],
-    "pantoprazol": ["pantoprazol", "pantocal"],
-
-    # --- Antipsicóticos ---
-    "risperidona": ["risperidona", "risperdal"],
-    "quetiapina": ["quetiapina", "seroquel"],
-    "haloperidol": ["haloperidol", "haldol"],
-    "olanzapina": ["olanzapina", "zyprexa"],
-    "clorpromazina": ["clorpromazina", "amplictil"]
-}
-
-# Dicionário de Pontuação de Carga Anticolinérgica (ACB Score)
-ACB_SCORES = {
-    "amitriptilina": 3, "prometazina": 3, "escopolamina": 3, "dimenidrinato": 3,
-    "dexclorfeniramina": 3, "hidroxizina": 3, "clorpromazina": 3, "olanzapina": 3,
-    "nortriptilina": 3, "carbamazepina": 2, "ciclobenzaprina": 2,
-    "risperidona": 1, "quetiapina": 1, "haloperidol": 1, "diazepam": 1, "alprazolam": 1
-}
-
-# =====================================================================
-# 2. FUNÇÕES DE PROCESSAMENTO TEXTUAL E IDENTIFICAÇÃO
-# =====================================================================
-def normalize_text(text: str) -> str:
-    """Remove acentos e converte para minúsculo"""
-    if not text:
-        return ""
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    return nfkd_form.encode('ASCII', 'ignore').decode('utf-8').lower()
-
-def identify_drug_canonical(drug_name: str) -> str:
-    """Identifica o nome genérico a partir de qualquer sinônimo ou nome comercial."""
-    if not drug_name:
-        return ""
-    normalized_input = normalize_text(drug_name)
-    for generic, synonyms in BEERS_DRUGS.items():
-        for syn in synonyms:
-            if normalize_text(syn) in normalized_input:
-                return generic
-    return ""
-
-def detect_drugs_in_prescription(prescription_text: str) -> list:
-    """Busca os medicamentos de risco no texto extraído do PDF."""
-    detected_drugs = []
-    normalized_text = normalize_text(prescription_text)
-    
-    for generic_name, synonyms in BEERS_DRUGS.items():
-        for synonym in synonyms:
-            clean_synonym = normalize_text(synonym)
-            if clean_synonym in normalized_text:
-                detected_drugs.append(generic_name)
-                break
-                
-    return detected_drugs
-
 # =====================================================================
 # 3. MOTOR CLÍNICO: AVALIAÇÃO BEERS E ACB SCORE
 # =====================================================================
@@ -158,6 +42,20 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             med_tag_map[canonical] = "Carga Anticolinérgica"
 
         # 2. Regras da Tabela 2 (Evitar na maioria dos idosos)
+        
+        # --- AQUI ESTÁ A CORREÇÃO DA FENITOÍNA ---
+        if canonical == "fenitoina":
+            alerts.append({
+                "drug": canonical.capitalize(),
+                "axis": "AGS Beers 2023 - Tabela 2 / Janela Estreita",
+                "recommendation": "Evitar uso. Risco elevado de toxicidade neurológica central (ataxia, nistagmo, declínio cognitivo e encefalopatia).",
+                "rationale": "Farmacocinética não linear e alta ligação proteica dependente de albumina. Altamente tóxico em idosos desnutridos.",
+                "tapering": "Avaliar substituição por Levetiracetam ou Lamotrigina se indicado. Monitorar nível sérico livre se uso compulsório.",
+                "is_sos": is_sos
+            })
+            med_tag_map[canonical] = "Tox. Neurológica"
+        # ----------------------------------------
+
         if canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
             snc_depressants.append(canonical)
             alerts.append({
