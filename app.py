@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-FarmBeers Backend API - Servidor Principal FastAPI + PostgreSQL
-Persistência Controlada (Apenas 1 registro por triagem processada)
-"""
 import os
 import io
 import re
@@ -10,14 +6,13 @@ import hashlib
 import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, func, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Float, ForeignKey, desc, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 
-# IMPORTAÇÃO CRÍTICA DO CÉREBRO CLÍNICO
 import clinical_rules
 
 # ==============================================================================
@@ -85,8 +80,7 @@ def run_auto_migrations():
                 conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS crcl_ml_min DOUBLE PRECISION;"))
                 conn.commit()
         except Exception as e:
-            print(f"Aviso na auto-migração: {e}")
-
+            pass
 run_auto_migrations()
 
 def get_db():
@@ -108,11 +102,8 @@ def init_default_users():
             user = db.query(User).filter(User.username == u).first()
             if not user:
                 new_user = User(
-                    username=u,
-                    password=hash_password(p),
-                    role=r,
-                    is_active=True,
-                    last_ping=datetime.datetime.utcnow()
+                    username=u, password=hash_password(p), role=r,
+                    is_active=True, last_ping=datetime.datetime.utcnow()
                 )
                 db.add(new_user)
             else:
@@ -129,7 +120,7 @@ init_default_users()
 # ==============================================================================
 # FASTAPI APP
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API", version="9.0.0")
+app = FastAPI(title="FarmBeers System API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -167,30 +158,24 @@ class ScreeningPayload(BaseModel):
     fall_risk: Optional[bool] = False
     conditions: Optional[List[str]] = []
     crcl_ml_min: Optional[float] = None
-    crcl_notes: Optional[str] = ""
     medications: List[MedicationInput] = []
     persist: Optional[bool] = True
 
 # ==============================================================================
-# AUTENTICAÇÃO
+# ROTAS DE AUTENTICAÇÃO E USUÁRIOS
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     pwd_h = hash_password(payload.password)
     user = db.query(User).filter(User.username == payload.username).first()
-
     if not user:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-
     if user.password != pwd_h and user.password != payload.password:
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-
     if user.password == payload.password:
         user.password = pwd_h
-
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Acesso bloqueado pela administração.")
-
+        raise HTTPException(status_code=403, detail="Acesso bloqueado.")
     user.last_ping = datetime.datetime.utcnow()
     db.commit()
     return {"status": "ok", "user": {"id": user.id, "username": user.username, "role": user.role}}
@@ -211,9 +196,6 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
         db.commit()
     return {"status": "logged_out"}
 
-# ==============================================================================
-# GESTÃO DE USUÁRIOS
-# ==============================================================================
 @app.get("/api/v1/admin/users")
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
@@ -222,11 +204,8 @@ def list_users(db: Session = Depends(get_db)):
     for u in users:
         is_online = bool(u.last_ping and (now - u.last_ping).total_seconds() <= 60)
         res.append({
-            "id": u.id,
-            "username": u.username,
-            "role": u.role,
-            "is_active": u.is_active,
-            "is_online": is_online
+            "id": u.id, "username": u.username, "role": u.role,
+            "is_active": u.is_active, "is_online": is_online
         })
     return res
 
@@ -236,11 +215,8 @@ def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
     if exists:
         raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
     new_u = User(
-        username=payload.username,
-        password=hash_password(payload.password),
-        role=payload.role,
-        is_active=True,
-        last_ping=datetime.datetime.utcnow()
+        username=payload.username, password=hash_password(payload.password),
+        role=payload.role, is_active=True, last_ping=datetime.datetime.utcnow()
     )
     db.add(new_u)
     db.commit()
@@ -252,10 +228,10 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido bloquear o administrador padrão.")
+        raise HTTPException(status_code=400, detail="Não é permitido bloquear o admin.")
     u.is_active = not u.is_active
     db.commit()
-    return {"status": "updated", "is_active": u.is_active}
+    return {"status": "updated"}
 
 @app.delete("/api/v1/admin/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
@@ -263,7 +239,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido excluir o administrador padrão.")
+        raise HTTPException(status_code=400, detail="Não é permitido excluir o admin.")
     db.delete(u)
     db.commit()
     return {"status": "deleted"}
@@ -272,50 +248,29 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
 # ROTA DE MÉTRICAS DA CFT
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
-def get_metrics(
-    year: Optional[str] = None,
-    month: Optional[str] = None,
-    day: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
+def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Optional[str] = None, db: Session = Depends(get_db)):
     try:
         all_screenings = db.query(ScreeningRecord).order_by(desc(ScreeningRecord.created_at)).all()
-        
         screenings = []
         for s in all_screenings:
             dt = s.created_at
-            if dt and year and year.strip().isdigit() and int(year.strip()) > 2000:
-                if dt.year != int(year.strip()):
-                    continue
-            if dt and month and month.strip().isdigit() and 1 <= int(month.strip()) <= 12:
-                if dt.month != int(month.strip()):
-                    continue
-            if dt and day and day.strip().isdigit() and 1 <= int(day.strip()) <= 31:
-                if dt.day != int(day.strip()):
-                    continue
+            if dt and year and year.strip().isdigit() and dt.year != int(year.strip()):
+                continue
+            if dt and month and month.strip().isdigit() and dt.month != int(month.strip()):
+                continue
+            if dt and day and day.strip().isdigit() and dt.day != int(day.strip()):
+                continue
             screenings.append(s)
 
         total_patients = len(screenings)
-        
-        count_uti = 0
-        count_upi = 0
-        for s in screenings:
-            sec = (s.sector or "").strip().upper()
-            if "UTI" in sec:
-                count_uti += 1
-            else:
-                count_upi += 1
+        count_uti = sum(1 for s in screenings if "UTI" in (s.sector or "").upper())
+        count_upi = total_patients - count_uti
 
         s_ids = [s.id for s in screenings]
-        total_alerts = 0
-        accepted_count = 0
-        top_5 = []
-
         if s_ids:
             alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
             total_alerts = len(alerts)
             accepted_count = sum(1 for a in alerts if a.outcome == "accepted")
-
             counts = {}
             for a in alerts:
                 d_name = a.drug_name or "Medicamento"
@@ -324,48 +279,37 @@ def get_metrics(
             top_5 = [{"drug": k, "count": v} for k, v in sorted_counts]
         else:
             total_alerts = sum((s.total_alerts or 0) for s in screenings)
+            accepted_count = 0
+            top_5 = []
 
         acceptance_rate = round((accepted_count / total_alerts * 100), 1) if total_alerts > 0 else 0.0
 
         return {
             "total_patients": total_patients,
-            "count_upi": count_upi,
-            "count_uti": count_uti,
+            "count_upi": count_upi, "count_uti": count_uti,
             "total_beers_alerts": total_alerts,
             "accepted_interventions": accepted_count,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
-    except Exception as e:
-        print(f"Erro em metrics: {e}")
-        return {
-            "total_patients": 0,
-            "count_upi": 0,
-            "count_uti": 0,
-            "total_beers_alerts": 0,
-            "accepted_interventions": 0,
-            "acceptance_rate": 0.0,
-            "top_5_beers": []
-        }
+    except Exception:
+        return {"total_patients": 0, "count_upi": 0, "count_uti": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
 
-# ==============================================================================
-# AUDITORIA E ATUALIZAÇÃO DO DESFECHO DA INTERVENÇÃO
-# ==============================================================================
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
     try:
         alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
         if not alert_rec:
-            return {"status": "not_found", "alert_id": alert_id}
+            return {"status": "not_found"}
         alert_rec.outcome = payload.outcome
         db.commit()
-        return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
+        return {"status": "updated"}
     except Exception as e:
         db.rollback()
-        return {"status": "error", "detail": str(e)}
+        return {"status": "error"}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM GRAVAÇÃO ÚNICA E CONTROLADA
+# MOTOR DE TRIAGEM COM GRAVAÇÃO
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -384,14 +328,11 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     
     if payload.medications and payload.persist:
         try:
-            sec_val = str(payload.sector) if payload.sector else "UPI (Enfermaria)"
-            crcl_val = float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None
-
             record = ScreeningRecord(
                 pharmacist_username="admin",
-                sector=sec_val,
+                sector=str(payload.sector) if payload.sector else "UPI (Enfermaria)",
                 patient_age=int(patient_age),
-                crcl_ml_min=crcl_val,
+                crcl_ml_min=float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None,
                 acb_score=int(acb_total),
                 total_alerts=len(alerts_raw),
                 created_at=datetime.datetime.utcnow()
@@ -401,7 +342,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
             db.refresh(record)
 
             for a in alerts_raw:
-                d_name = str(a.get("drug") or a.get("drug_name") or "Medicamento")
+                d_name = str(a.get("drug", "Medicamento"))
                 alert_rec = ScreeningAlertRecord(
                     screening_id=record.id,
                     drug_name=d_name,
@@ -413,22 +354,19 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
                 db.commit()
                 db.refresh(alert_rec)
                 persisted_records.append(alert_rec.id)
-        except Exception as err:
+        except Exception:
             db.rollback()
-            print(f"Erro ao salvar triagem: {err}")
 
     alerts_complete = []
     for idx, a in enumerate(alerts_raw):
-        d_name = a.get("drug") or a.get("drug_name") or "Medicamento"
-        db_id = persisted_records[idx] if idx < len(persisted_records) else None
         alerts_complete.append({
-            "id": db_id,
-            "drug": d_name,
-            "drug_name": d_name,
-            "axis": a.get("axis", "AGS Beers 2023"),
-            "recommendation": a.get("recommendation", "Reavaliar prescrição."),
-            "rationale": a.get("rationale", "Medicamento potencialmente inapropriado para idosos."),
-            "tapering": a.get("tapering", ""),
+            "id": persisted_records[idx] if idx < len(persisted_records) else None,
+            "drug": a.get("drug"),
+            "drug_name": a.get("drug"),
+            "axis": a.get("axis"),
+            "recommendation": a.get("recommendation"),
+            "rationale": a.get("rationale"),
+            "tapering": a.get("tapering"),
             "is_sos": a.get("is_sos", False),
             "acb_score": a.get("acb_score", 0),
             "outcome": "pending"
@@ -438,18 +376,8 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
 
     med_rows = []
     for m in payload.medications:
-        # Usa a mesma função de normalização do clinical_rules para identificar se é alvo
-        canonical_name = ""
-        normalized_m_name = clinical_rules.normalize_text(m.name)
-        for gen_name, synonyms in clinical_rules.BEERS_DRUGS.items():
-            for syn in synonyms:
-                if clinical_rules.normalize_text(syn) in normalized_m_name:
-                    canonical_name = gen_name
-                    break
-            if canonical_name:
-                break
-        
-        matched = alert_by_canonical.get(canonical_name) if canonical_name else None
+        canonical_name = clinical_rules.identify_drug_canonical(m.name)
+        matched = alert_by_canonical.get(canonical_name.lower()) if canonical_name else None
 
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
@@ -485,7 +413,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR USANDO A NOVA LÓGICA DO CLINICAL_RULES
+# EXTRAÇÃO DE PDF HOSPITALAR VIA REGEX LINHA A LINHA
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
@@ -507,8 +435,6 @@ def extract_posology_details(line: str):
         route = "Inalatório"
     elif re.search(r'\b(t[oó]pic[ao]|creme|pomada)\b', line, re.I):
         route = "Tópico"
-    elif re.search(r'\b(vo|oral)\b', line, re.I):
-        route = "VO (Oral)"
 
     if re.search(r'\b(sn|qn|sos|se\s+necess[aá]rio|quando\s+necess[aá]rio|a\s+crit[eé]rio\s+m[eé]dico|acm)\b', line, re.I):
         is_sn = True
@@ -524,54 +450,47 @@ def extract_posology_details(line: str):
 async def extract_pdf(file: UploadFile = File(...)):
     contents = await file.read()
     extracted_items = []
-    seen = set()
+    seen_generics = set()
     
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            texto_completo = ""
             for page in pdf.pages:
                 text = page.extract_text()
-                if text:
-                    texto_completo += text + "\n"
-
-            if not texto_completo.strip():
-                raise ValueError("Nenhum texto extraído do PDF.")
-
-            # PASSO 1: Encontra QUAIS drogas de risco estão no PDF inteiro usando a nova função
-            medicamentos_detectados = clinical_rules.detect_drugs_in_prescription(texto_completo)
-            
-            # PASSO 2: Varre linha por linha para tentar capturar a posologia dessas drogas detectadas
-            for line in texto_completo.split("\n"):
-                line_clean = line.strip()
-                if not line_clean:
+                if not text:
                     continue
                 
-                normalized_line = clinical_rules.normalize_text(line_clean)
-                
-                # Para cada droga que sabemos que existe no PDF, procuramos em qual linha ela está
-                for generic_name in medicamentos_detectados:
-                    if generic_name in seen:
-                        continue # Já pegou essa droga
+                # Leitura implacável, linha por linha
+                for line in text.split("\n"):
+                    line_clean = line.strip()
+                    if not line_clean:
+                        continue
                         
-                    synonyms = clinical_rules.BEERS_DRUGS.get(generic_name, [])
-                    found_in_line = False
+                    # Remove acentos da linha para não falhar na busca
+                    normalized_line = clinical_rules.normalize_text(line_clean)
                     
-                    for syn in synonyms:
-                        clean_syn = clinical_rules.normalize_text(syn)
-                        if clean_syn in normalized_line:
-                            found_in_line = True
-                            break
-                            
-                    if found_in_line:
-                        seen.add(generic_name)
-                        dose, route, freq, is_sn = extract_posology_details(line_clean)
-                        extracted_items.append({
-                            "name": generic_name.capitalize(),
-                            "dose": dose,
-                            "route": route,
-                            "frequency": freq,
-                            "is_sos": is_sn
-                        })
+                    found_generics_in_line = []
+                    
+                    # Varre a linha testando todos os remédios do dicionário
+                    for generic, synonyms in clinical_rules.BEERS_DRUGS.items():
+                        for syn in synonyms:
+                            # Verifica se o sinônimo está no texto da linha
+                            if clinical_rules.normalize_text(syn) in normalized_line:
+                                if generic not in found_generics_in_line:
+                                    found_generics_in_line.append(generic)
+                                break # Achou o remédio, pula os outros sinônimos dele
+                    
+                    # Se achou remédios nesta linha, extrai a posologia
+                    for generic in found_generics_in_line:
+                        if generic not in seen_generics:
+                            seen_generics.add(generic)
+                            dose, route, freq, is_sn = extract_posology_details(line_clean)
+                            extracted_items.append({
+                                "name": generic.capitalize(),
+                                "dose": dose,
+                                "route": route,
+                                "frequency": freq,
+                                "is_sos": is_sn
+                            })
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
