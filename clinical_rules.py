@@ -3,11 +3,9 @@ import re
 import unicodedata
 
 # =====================================================================
-# 1. DICIONÁRIO MESTRE DE DROGAS (AGS Beers 2023 + ACB)
-# Total: 49 Princípios Ativos de Alto Risco mapeados.
+# 1. DICIONÁRIO MESTRE DE DROGAS (Radar Beers / AGS 2023 + ACB)
 # =====================================================================
 BEERS_DRUGS = {
-    # 1. SNC e Anticonvulsivantes
     "fenobarbital": ["fenobarbital", "gardenal", "fenocris", "edhanol"],
     "fenitoina": ["fenitoina", "hidantal", "epamin"],
     "diazepam": ["diazepam", "valium", "compaz", "diazepax"],
@@ -18,8 +16,6 @@ BEERS_DRUGS = {
     "zolpidem": ["zolpidem", "stilnox", "patz", "turner"],
     "carbamazepina": ["carbamazepina", "tegretol"],
     "acido valproico": ["acido valproico", "valproato", "depakene", "depakote"],
-
-    # 2. Anticolinérgicos e Anti-histamínicos
     "prometazina": ["prometazina", "fenergan"],
     "dimenidrinato": ["dimenidrinato", "dramin", "nausicalm"],
     "dexclorfeniramina": ["dexclorfeniramina", "polaramine", "histamin"],
@@ -27,16 +23,12 @@ BEERS_DRUGS = {
     "escopolamina": ["escopolamina", "hioscina", "buscopan", "hyoscine"],
     "amitriptilina": ["amitriptilina", "tryptanol", "amytril"],
     "nortriptilina": ["nortriptilina", "pamelor"],
-
-    # 3. Analgésicos, Opioides e Relaxantes Musculares
     "ciclobenzaprina": ["ciclobenzaprina", "miosan", "musculare"],
     "orfenadrina": ["orfenadrina", "dorflex"],
     "carisoprodol": ["carisoprodol", "torsilax", "tandrilax"],
     "morfina": ["morfina", "dimorf"],
     "tramadol": ["tramadol", "tramal", "sylador"],
     "codeina": ["codeina", "tylex", "paco"],
-
-    # 4. AINEs
     "cetoprofeno": ["cetoprofeno", "profenid", "biprofenid"],
     "diclofenaco": ["diclofenaco", "voltaren", "cataflam", "flotac"],
     "ibuprofeno": ["ibuprofeno", "alivium", "advil"],
@@ -44,8 +36,6 @@ BEERS_DRUGS = {
     "nimesulida": ["nimesulida", "nisulid", "cimelide"],
     "cetorolaco": ["cetorolaco", "toragesic", "trometamol"],
     "meloxicam": ["meloxicam", "bioflex", "movatec"],
-
-    # 5. Cardiovasculares e Renais
     "clonidina": ["clonidina", "atensina"],
     "doxazosina": ["doxazosina", "cardura"],
     "metildopa": ["metildopa", "aldomet"],
@@ -54,16 +44,12 @@ BEERS_DRUGS = {
     "espironolactona": ["espironolactona", "aldactone", "diempax"],
     "enoxaparina": ["enoxaparina", "clexane", "versa"],
     "varfarina": ["varfarina", "marevan", "coumadin"],
-
-    # 6. Endocrinologia e TGI
     "glibenclamida": ["glibenclamida", "daonil"],
     "glimepirida": ["glimepirida", "amaryl"],
     "metoclopramida": ["metoclopramida", "plasil"],
     "oleo mineral": ["oleo mineral", "nujol"],
     "omeprazol": ["omeprazol", "losec", "peptazol"],
     "pantoprazol": ["pantoprazol", "pantocal"],
-
-    # 7. Antipsicóticos
     "risperidona": ["risperidona", "risperdal"],
     "quetiapina": ["quetiapina", "seroquel"],
     "haloperidol": ["haloperidol", "haldol"],
@@ -71,9 +57,6 @@ BEERS_DRUGS = {
     "clorpromazina": ["clorpromazina", "amplictil"]
 }
 
-# =====================================================================
-# ESCORE ACB (Gera pontuação paralela independente)
-# =====================================================================
 ACB_SCORES = {
     "amitriptilina": 3, "prometazina": 3, "escopolamina": 3, "dimenidrinato": 3,
     "dexclorfeniramina": 3, "hidroxizina": 3, "clorpromazina": 3, "olanzapina": 3,
@@ -82,7 +65,7 @@ ACB_SCORES = {
 }
 
 # =====================================================================
-# FUNÇÕES DE PROCESSAMENTO
+# 2. FUNÇÕES DE PROCESSAMENTO
 # =====================================================================
 def normalize_text(text: str) -> str:
     if not text: return ""
@@ -109,7 +92,7 @@ def detect_drugs_in_prescription(prescription_text: str) -> list:
     return detected_drugs
 
 # =====================================================================
-# 3. MOTOR CLÍNICO: MAPA EXAUSTIVO DAS 49 DROGAS (BLINDADO)
+# 3. MOTOR CLÍNICO: MAPA EXAUSTIVO (BLINDADO)
 # =====================================================================
 def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, crcl=None):
     alerts = []
@@ -132,7 +115,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
 
         is_sos = med.get("is_sos", False)
 
-        # PARTE A: GERAÇÃO DO ESCORE ACB (Se aplicável)
+        # PARTE A: ESCORE ACB
         if canonical in ACB_SCORES:
             score = ACB_SCORES[canonical]
             acb_total += score
@@ -146,9 +129,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "acb_score": score
             })
 
-        # PARTE B: REGRAS ESTRITAS DE BEERS (Garante que as 49 drogas disparem alerta)
-        
-        # GRUPO 1: ANTICOLINÉRGICOS FORTES (Tabela 2)
+        # PARTE B: REGRAS ESTRITAS DE BEERS
         if canonical in ["prometazina", "dimenidrinato", "dexclorfeniramina", "hidroxizina", "escopolamina", "amitriptilina", "nortriptilina"]:
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -160,7 +141,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Alto Risco Anticolinérgico"
 
-        # GRUPO 2: BENZODIAZEPÍNICOS, DROGAS Z E BARBITÚRICOS
         elif canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
             snc_depressants.append(canonical)
             alerts.append({
@@ -173,7 +153,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Risco Queda/SNC"
 
-        # GRUPO 3: FENITOÍNA
         elif canonical == "fenitoina":
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -185,7 +164,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Tox. Neurológica"
 
-        # GRUPO 4: OUTROS ANTICONVULSIVANTES E ESTABILIZADORES
         elif canonical in ["carbamazepina", "acido valproico"]:
             snc_depressants.append(canonical)
             alerts.append({
@@ -198,7 +176,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Risco SNC/SIADH"
 
-        # GRUPO 5: RELAXANTES MUSCULARES
         elif canonical in ["ciclobenzaprina", "orfenadrina", "carisoprodol"]:
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -210,20 +187,18 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Relaxante Muscular Inadequado"
 
-        # GRUPO 6: AINEs
         elif canonical in ["cetoprofeno", "diclofenaco", "ibuprofeno", "naproxeno", "nimesulida", "cetorolaco", "meloxicam"]:
             nsaids.append(canonical)
             alerts.append({
                 "drug": canonical.capitalize(),
                 "axis": "AGS Beers 2023 - Tabela 2",
-                "recommendation": "Evitar uso, principalmente crônico. Risco grave de HDA e Lesão Renal Aguda.",
+                "recommendation": "Evitar uso. Risco grave de HDA e Lesão Renal Aguda.",
                 "rationale": "Inibição de COX afeta diretamente a barreira mucosa e a perfusão glomerular.",
                 "tapering": "Suspender imediatamente. Substituir por Paracetamol ou opioide fraco.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco Renal/HDA"
 
-        # GRUPO 7: OPIOIDES (Inclui alerta obrigatório de renal para morfina)
         elif canonical in ["morfina", "tramadol", "codeina"]:
             snc_depressants.append(canonical)
             if canonical == "morfina":
@@ -258,7 +233,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 })
                 med_tag_map[canonical] = "Opioide/SNC"
 
-        # GRUPO 8: ALFA-AGONISTAS E CARDIO
         elif canonical in ["clonidina", "doxazosina", "metildopa"]:
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -292,7 +266,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Janela Estreita"
 
-        # GRUPO 9: RENAL EXCLUSIVO (Espironolactona e Enoxaparina)
         elif canonical == "espironolactona":
             if crcl is not None and crcl < 30:
                 alerts.append({
@@ -350,7 +323,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Risco Hemorragia"
 
-        # GRUPO 10: ENDÓCRINO E TGI
         elif canonical in ["glibenclamida", "glimepirida"]:
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -395,7 +367,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             med_tag_map[canonical] = "Uso Crônico Indevido"
 
-        # GRUPO 11: ANTIPSICÓTICOS
         elif canonical in ["risperidona", "quetiapina", "haloperidol", "olanzapina", "clorpromazina"]:
             snc_depressants.append(canonical)
             alerts.append({
@@ -403,12 +374,12 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "axis": "AGS Beers 2023 - Tabela 2 (Antipsicóticos)",
                 "recommendation": "Evitar como rotina para insônia ou agitação demencial leve.",
                 "rationale": "Black Box Warning: triplica risco de AVC isquêmico e morte súbita em idosos com demência.",
-                "tapering": "Usar apenas no delirium grave (menor dose/tempo). Desmamar o quanto antes.",
+                "tapering": "Usar apenas no delirium hiperativo grave. Desmamar o quanto antes.",
                 "is_sos": is_sos
             })
             med_tag_map[canonical] = "Risco AVC/Mortalidade"
 
-    # PARTE C: AVALIAÇÃO DE INTERAÇÕES SINÉRGICAS (Tabela 4)
+    # PARTE C: INTERAÇÕES SINÉRGICAS
     if len(snc_depressants) >= 2:
         alerts.append({
             "drug": "Múltiplos Depressores do SNC",
@@ -429,7 +400,13 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             "is_sos": False
         })
 
-    # PARTE D: FECHAMENTO ACB
+    # PARTE D: ADAPTAÇÃO PARA DROGAS SOS/SN (Evitar administração pela enfermagem)
+    for alert in alerts:
+        if alert.get("is_sos"):
+            alert["recommendation"] = f"[RESGATE SOS]: {alert['recommendation']} Orientar a enfermagem a reter a administração e comunicar o farmacêutico."
+            alert["tapering"] = "Solicitar bloqueio do uso à equipe assistencial e sugerir troca do item de resgate."
+
+    # PARTE E: FECHAMENTO ACB
     acb_text = "Carga Nula ou Leve. Risco controlado."
     if acb_total >= 3:
         acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo, delirium e retenção periférica."
