@@ -16,7 +16,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# BASE DE DADOS POSTGRESQL (PERSISTENTE E AUTO-MIGRADA)
+# BASE DE DADOS POSTGRESQL (Mantém farmbeers.db internamente para não perder histórico)
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -51,7 +51,7 @@ class ScreeningRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     pharmacist_username = Column(String(50), default="admin", nullable=True)
-    sector = Column(String(50), default="UPI (Enfermaria)", nullable=True)
+    sector = Column(String(50), default="Enfermaria", nullable=True)
     patient_age = Column(Integer, default=70, nullable=True)
     crcl_ml_min = Column(Float, nullable=True)
     acb_score = Column(Integer, default=0, nullable=True)
@@ -118,9 +118,9 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI APP
+# FASTAPI APP - NOVO NOME
 # ==============================================================================
-app = FastAPI(title="FarmBeers System API")
+app = FastAPI(title="Radar Beers API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -154,7 +154,7 @@ class MedicationInput(BaseModel):
 
 class ScreeningPayload(BaseModel):
     age: Optional[int] = 70
-    sector: Optional[str] = "UPI (Enfermaria)"
+    sector: Optional[str] = "Enfermaria"
     fall_risk: Optional[bool] = False
     conditions: Optional[List[str]] = []
     crcl_ml_min: Optional[float] = None
@@ -245,7 +245,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS DA CFT
+# ROTA DE MÉTRICAS (EXCLUSIVO PARA ENFERMARIA)
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Optional[str] = None, db: Session = Depends(get_db)):
@@ -263,8 +263,6 @@ def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Op
             screenings.append(s)
 
         total_patients = len(screenings)
-        count_uti = sum(1 for s in screenings if "UTI" in (s.sector or "").upper())
-        count_upi = total_patients - count_uti
 
         s_ids = [s.id for s in screenings]
         if s_ids:
@@ -286,14 +284,16 @@ def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Op
 
         return {
             "total_patients": total_patients,
-            "count_upi": count_upi, "count_uti": count_uti,
+            "count_enfermaria": total_patients,
+            "count_upi": 0,  # Mantido zerado caso o frontend ainda dependa da chave antiga
+            "count_uti": 0,  # Mantido zerado
             "total_beers_alerts": total_alerts,
             "accepted_interventions": accepted_count,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception:
-        return {"total_patients": 0, "count_upi": 0, "count_uti": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
+        return {"total_patients": 0, "count_enfermaria": 0, "count_upi": 0, "count_uti": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
 
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
@@ -309,7 +309,7 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
         return {"status": "error"}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM GRAVAÇÃO
+# MOTOR DE TRIAGEM COM GRAVAÇÃO (Foco em Enfermaria)
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -330,7 +330,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         try:
             record = ScreeningRecord(
                 pharmacist_username="admin",
-                sector=str(payload.sector) if payload.sector else "UPI (Enfermaria)",
+                sector=str(payload.sector) if payload.sector else "Enfermaria",
                 patient_age=int(patient_age),
                 crcl_ml_min=float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None,
                 acb_score=int(acb_total),
@@ -459,27 +459,21 @@ async def extract_pdf(file: UploadFile = File(...)):
                 if not text:
                     continue
                 
-                # Leitura implacável, linha por linha
                 for line in text.split("\n"):
                     line_clean = line.strip()
                     if not line_clean:
                         continue
                         
-                    # Remove acentos da linha para não falhar na busca
                     normalized_line = clinical_rules.normalize_text(line_clean)
-                    
                     found_generics_in_line = []
                     
-                    # Varre a linha testando todos os remédios do dicionário
                     for generic, synonyms in clinical_rules.BEERS_DRUGS.items():
                         for syn in synonyms:
-                            # Verifica se o sinônimo está no texto da linha
                             if clinical_rules.normalize_text(syn) in normalized_line:
                                 if generic not in found_generics_in_line:
                                     found_generics_in_line.append(generic)
-                                break # Achou o remédio, pula os outros sinônimos dele
+                                break 
                     
-                    # Se achou remédios nesta linha, extrai a posologia
                     for generic in found_generics_in_line:
                         if generic not in seen_generics:
                             seen_generics.add(generic)
@@ -510,4 +504,4 @@ def read_root():
     if os.path.exists("index.html"):
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
-    return "<h1>FarmBeers Online. Arquivo index.html não localizado.</h1>"
+    return "<h1>Radar Beers Online. Arquivo index.html não localizado.</h1>"
