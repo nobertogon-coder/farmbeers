@@ -1,1318 +1,606 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FarmBeers - Triagem Farmacêutica</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
-    html, body {
-      max-width: 100vw;
-      overflow-x: hidden;
-      background-color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    @media (max-width: 768px) {
-      input, select, textarea {
-        font-size: 16px !important;
-      }
-      .mobile-stack {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 0.75rem !important;
-      }
-      .mobile-full {
-        width: 100% !important;
-      }
-    }
-    @media print {
-      header, #adminActionButtons, .no-print, button, #btnManualOperacional {
-        display: none !important;
-      }
-      body, main {
-        background: #ffffff !important;
-        padding: 0 !important;
-        margin: 0 !important;
-      }
-      #screeningReportBox {
-        display: block !important;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar Beers - Triagem Farmacêutica</title>
+    <!-- Tailwind CSS (via CDN para exemplo, idealmente configurar via npm) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados mínimos (opcional) */
+        body { font-family: sans-serif; }
+    </style>
 </head>
-<body class="antialiased min-h-screen flex flex-col text-slate-800">
+<body class="bg-gray-100">
 
-  <!-- MODAL DE LOGIN -->
-  <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-90 px-4">
-    <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 border border-slate-200">
-      <div class="text-center mb-5">
-        <div class="inline-flex p-2.5 bg-[#0b2447] text-cyan-400 rounded-lg mb-2">
-          <i data-lucide="shield-check" class="w-7 h-7"></i>
-        </div>
-        <h2 class="text-xl font-bold text-slate-900">Farm<span class="text-cyan-400">Beers</span></h2>
-        <p class="text-[11px] text-cyan-700 font-semibold uppercase tracking-wider">Triagem Farmacêutica AGS Beers</p>
-      </div>
-
-      <div class="space-y-3.5">
-        <div>
-          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Usuário</label>
-          <input type="text" id="txtUsername" autofocus
-            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none"
-            placeholder="Ex: admin" onkeydown="if(event.key==='Enter') executeLogin();">
-        </div>
-        <div>
-          <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Senha</label>
-          <input type="password" id="txtPass"
-            class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none"
-            placeholder="••••••••" onkeydown="if(event.key==='Enter') executeLogin();">
-        </div>
-        <div id="loginErrMsg" class="hidden text-xs text-rose-600 bg-rose-50 p-2 rounded border border-rose-200">
-          Usuário ou senha incorretos.
-        </div>
-        <button type="button" onclick="executeLogin()"
-          class="w-full py-2.5 bg-[#008170] hover:bg-[#005B41] text-white font-bold text-sm rounded-lg shadow transition">
-          Entrar no Sistema
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: MANUAL OPERACIONAL -->
-  <div id="manualModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-3 sm:p-4 no-print">
-    <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[85vh] overflow-hidden">
-      
-      <div class="bg-[#0b2447] text-white px-5 py-3.5 flex justify-between items-center sticky top-0 z-10">
-        <div class="flex items-center gap-2">
-          <i data-lucide="book-open" class="w-5 h-5 text-cyan-400"></i>
-          <h3 class="text-sm font-bold tracking-wide uppercase">Manual Operacional FarmBeers</h3>
-        </div>
-        <button type="button" onclick="toggleManualModal(false)" class="text-slate-300 hover:text-white p-2 -mr-1">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs text-slate-700 leading-relaxed">
-        <div class="border-b border-slate-200 pb-3">
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">1. Objetivo e Âmbito Clínico</h4>
-          <p>
-            O <strong>FarmBeers</strong> é uma ferramenta de suporte à decisão clínica baseada nas diretrizes da <em>American Geriatrics Society</em> (AGS Beers Criteria 2023), aplicada aos medicamentos hospitalares brasileiros para prevenção de eventos adversos e morbimortalidade geriátrica.
-          </p>
-        </div>
-
-        <div class="border-b border-slate-200 pb-3">
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">2. Critério Etário de Triagem</h4>
-          <p>
-            A avaliação de Beers aplica-se a pacientes com <strong>idade igual ou superior a 65 anos</strong>. Para idades inferiores, o motor clínico valida a prescrição sem emitir alertas da Tabela 2 por definição de diretriz.
-          </p>
-        </div>
-
-        <div class="border-b border-slate-200 pb-3">
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">3. Posologia Diferenciada: Uso Fixo vs. SN / QN (Se Necessário)</h4>
-          <p>
-            Medicamentos sinalizados como <strong>SN (Se Necessário)</strong> ou <strong>QN (Quando Necessário)</strong> recebem orientações de monitorização e vigilância, evitando recomendações agressivas de desprescrição destinadas a regimes contínuos fixos.
-          </p>
-        </div>
-
-        <div class="border-b border-slate-200 pb-3">
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">4. Classes Críticas e Medicamentos a Evitar (Tabela 2 e Tabela 4)</h4>
-          <ul class="list-disc pl-4 space-y-1 mt-1 text-slate-600">
-            <li><strong>Anti-histamínicos de 1ª Geração:</strong> Potente ação anticolinérgica. Sedação, boca seca, constipação, retenção urinária e delirium.</li>
-            <li><strong>Benzodiazepínicos e Hipnóticos Z:</strong> Risco de quedas, fraturas e confusão mental aguda. Exigem desmame (*tapering*).</li>
-            <li><strong>Interações da Tabela 4:</strong> Associações Opioide + BZD/Z, Anticoagulante + AINE e IECA/BRA + Espironolactona geram alertas específicos.</li>
-            <li><strong>AINEs Sistêmicos:</strong> Risco de sangramento gastrointestinal e injúria renal aguda.</li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 class="text-xs font-bold text-[#0b2447] uppercase tracking-wider mb-1">5. Carga Anticolinérgica (ACB Score) e Função Renal</h4>
-          <p>
-            O sistema quantifica a soma anticolinérgica total. Escores $\ge 3$ pontos apontam risco crítico de delirium hospitalar. O Clearance de Creatinina utiliza o método Cockcroft-Gault com correção de peso ajustado e piso de creatinina para sarcopenia.
-          </p>
-        </div>
-      </div>
-
-      <div class="bg-slate-100 px-5 py-2.5 border-t border-slate-200 flex justify-end">
-        <button type="button" onclick="toggleManualModal(false)" class="bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold px-4 py-1.5 rounded shadow">
-          Fechar Manual
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- MODAL: CONFERÊNCIA DE EXTRAÇÃO PDF -->
-  <div id="pdfReviewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4 no-print">
-    <div class="bg-white w-full max-w-lg rounded-xl shadow-2xl p-5 border border-slate-200 space-y-3">
-      <div class="flex justify-between items-center border-b pb-2">
-        <h3 class="text-xs font-bold uppercase text-slate-800 flex items-center gap-1.5">
-          <i data-lucide="check-square" class="w-4 h-4 text-cyan-600"></i> Conferência de Fármacos Extraídos (PDF)
-        </h3>
-        <button onclick="togglePdfReviewModal(false)" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-      <p class="text-[11px] text-slate-500">
-        Confirme os medicamentos e posologias identificadas no documento antes de inseri-los na lista ativa:
-      </p>
-      <div id="pdfExtractedChecklist" class="space-y-1.5 max-h-64 overflow-y-auto p-2 bg-slate-50 rounded border text-xs"></div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" onclick="togglePdfReviewModal(false)" class="px-3 py-1.5 text-xs text-slate-600 bg-slate-100 rounded">Cancelar</button>
-        <button type="button" onclick="confirmPdfMedications()" class="px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow">Adicionar Selecionados</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: GESTÃO DE USUÁRIOS (ADMIN) -->
-  <div id="usersAdminModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-70 px-4 no-print">
-    <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-6 border border-slate-200 space-y-4">
-      <div class="flex justify-between items-center border-b pb-3">
-        <h3 class="text-sm font-bold uppercase text-slate-800 flex items-center gap-2">
-          <i data-lucide="users" class="w-4 h-4 text-cyan-600"></i> Gestão de Usuários do Sistema
-        </h3>
-        <button onclick="toggleUsersModal(false)" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-
-      <form onsubmit="handleCreateUser(event)" class="bg-slate-50 p-3 rounded border border-slate-200 space-y-2">
-        <span class="text-[11px] font-bold text-slate-700 uppercase block">+ Cadastrar Novo Usuário</span>
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-          <input type="text" id="newUsername" required placeholder="Nome de Usuário" class="text-xs p-1.5 border rounded bg-white outline-none">
-          <input type="password" id="newUserPass" required placeholder="Senha de Acesso" class="text-xs p-1.5 border rounded bg-white outline-none">
-          <select id="newUserRole" class="text-xs p-1.5 border rounded bg-white outline-none">
-            <option value="pharmacist">Farmacêutico</option>
-            <option value="admin">Administrador</option>
-          </select>
-          <button type="submit" class="bg-[#008170] hover:bg-[#005B41] text-white text-xs font-bold rounded py-1.5 shadow">Salvar</button>
-        </div>
-        <div id="createUserMsg" class="hidden text-xs p-1.5 rounded"></div>
-      </form>
-
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs text-left min-w-[500px]">
-          <thead>
-            <tr class="border-b text-slate-500 uppercase text-[10px]">
-              <th class="py-1.5">Usuário</th>
-              <th class="py-1.5">Perfil</th>
-              <th class="py-1.5">Presença</th>
-              <th class="py-1.5">Conta</th>
-              <th class="py-1.5 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="usersTableBody" class="divide-y divide-slate-100">
-            <tr><td colspan="5" class="py-4 text-center text-slate-400">Carregando usuários...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: INDICADORES CLÍNICOS CFT (RESPONSIVO COM BOTÃO X SEMPRE VISÍVEL) -->
-  <div id="metricsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-75 p-3 sm:p-4 no-print">
-    <div class="bg-white w-full max-w-3xl rounded-xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
-      
-      <!-- CABEÇALHO FIXO -->
-      <div class="bg-white px-5 py-3.5 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
-        <div>
-          <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
-            <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-600"></i> Indicadores Clínicos de Beers & CFT
-          </h3>
-          <p class="text-[11px] text-slate-500 hidden sm:block">Métricas consolidadas de intervenção e taxa de aceitação médica para pesquisa</p>
-        </div>
-        <button type="button" onclick="toggleMetricsModal(false)" class="text-slate-500 hover:text-slate-800 p-2 -mr-1 rounded-lg hover:bg-slate-100" title="Fechar Indicadores">
-          <i data-lucide="x" class="w-6 h-6 text-slate-700"></i>
-        </button>
-      </div>
-
-      <!-- CORPO ROLÁVEL -->
-      <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
-        
-        <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-wrap items-center gap-2.5 text-xs">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Dia</label>
-            <input type="number" id="filterDay" min="1" max="31" placeholder="Todos" class="w-16 p-1.5 border rounded bg-white outline-none">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Mês</label>
-            <select id="filterMonth" class="p-1.5 border rounded bg-white outline-none">
-              <option value="">Todos os Meses</option>
-              <option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option>
-              <option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option>
-              <option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option>
-              <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ano</label>
-            <input type="number" id="filterYear" placeholder="Geral" class="w-20 p-1.5 border rounded bg-white outline-none">
-          </div>
-          <button type="button" onclick="loadMetricsData()" class="mt-4 bg-[#0b2447] hover:bg-[#19376d] text-white font-bold px-3 py-1.5 rounded shadow">
-            Filtrar Período
-          </button>
-          <button type="button" onclick="clearMetricsFilter()" class="mt-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-2.5 py-1.5 rounded">
-            Limpar Filtros
-          </button>
-        </div>
-
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div class="bg-cyan-50/70 p-3 rounded-lg border border-cyan-200 text-center">
-            <span class="text-[9px] font-bold text-cyan-800 uppercase tracking-wider block">Total Pacientes</span>
-            <strong id="metricTotalPatients" class="text-xl font-extrabold text-[#0b2447] mt-0.5 block">0</strong>
-          </div>
-          <div class="bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 text-center">
-            <span class="text-[9px] font-bold text-emerald-800 uppercase tracking-wider block">UPI (Enfermaria)</span>
-            <strong id="metricTotalUPI" class="text-xl font-extrabold text-emerald-700 mt-0.5 block">0</strong>
-          </div>
-          <div class="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200 text-center">
-            <span class="text-[9px] font-bold text-indigo-800 uppercase tracking-wider block">UTI</span>
-            <strong id="metricTotalUTI" class="text-xl font-extrabold text-indigo-700 mt-0.5 block">0</strong>
-          </div>
-          <div class="bg-emerald-100/70 p-3 rounded-lg border border-emerald-300 text-center">
-            <span class="text-[9px] font-bold text-emerald-900 uppercase tracking-wider block">Aceitação Médica</span>
-            <strong id="metricAcceptanceRate" class="text-xl font-extrabold text-emerald-800 mt-0.5 block">0.0%</strong>
-          </div>
-        </div>
-
-        <div class="bg-amber-50/70 p-3 rounded-lg border border-amber-200 text-center">
-          <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Total de Alertas de Beers Identificados</span>
-          <strong id="metricTotalBeersAlerts" class="text-2xl font-extrabold text-amber-600 mt-0.5 block">0</strong>
-        </div>
-
-        <div class="border border-slate-200 rounded-lg p-3.5 bg-white">
-          <h4 class="text-xs font-bold uppercase text-slate-700 mb-2 flex items-center gap-1.5">
-            <i data-lucide="flame" class="w-4 h-4 text-rose-500"></i> Top 5 Medicamentos Inapropriados Mais Encontrados
-          </h4>
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs text-left min-w-[300px]">
-              <thead>
-                <tr class="border-b text-slate-400 uppercase text-[10px]">
-                  <th class="py-1.5">Fármaco de Beers</th>
-                  <th class="py-1.5 text-right">Ocorrências</th>
-                </tr>
-              </thead>
-              <tbody id="top5TableBody" class="divide-y divide-slate-100">
-                <tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro para o período.</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- RODAPÉ DE FECHAMENTO -->
-      <div class="bg-slate-100 px-5 py-2.5 border-t border-slate-200 flex justify-end">
-        <button type="button" onclick="toggleMetricsModal(false)" class="bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold px-4 py-2 rounded shadow">
-          Fechar Indicadores
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- BARRA SUPERIOR -->
-  <header class="bg-[#0b2447] text-white px-4 sm:px-6 py-2.5 shadow-md sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-      
-      <div class="flex items-center justify-between w-full md:w-auto">
+    <!-- Cabeçalho (Navbar) -->
+    <nav class="bg-[#1e293b] text-white p-4 flex justify-between items-center">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded bg-[#19376d] border border-cyan-500 flex items-center justify-center font-bold text-cyan-400 text-sm">
-            FB
-          </div>
-          <div>
-            <span class="text-base font-bold tracking-tight text-white">Farm<span class="text-cyan-400">Beers</span></span>
-            <span class="block text-[9px] text-cyan-400 tracking-wider uppercase font-semibold -mt-1">Triagem Farmacêutica</span>
-          </div>
-        </div>
-
-        <button onclick="executeLogout()" class="md:hidden text-slate-300 hover:text-rose-400 text-xs flex items-center gap-1">
-          <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sair
-        </button>
-      </div>
-
-      <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full md:w-auto">
-        <button onclick="resetFullApp()"
-          class="bg-[#008170] hover:bg-[#005B41] text-white text-xs font-semibold px-3 py-1.5 rounded flex items-center gap-1.5 shadow transition">
-          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-          <span>Nova Triagem</span>
-        </button>
-
-        <button type="button" onclick="toggleManualModal(true)"
-           class="bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold px-3.5 py-1.5 rounded flex items-center gap-1.5 shadow transition border border-cyan-400/30"
-           title="Visualizar Manual Operacional">
-          <i data-lucide="book-marked" class="w-3.5 h-3.5 text-cyan-200"></i>
-          <span>Manual Operacional</span>
-        </button>
-      </div>
-
-      <div class="flex flex-wrap items-center justify-center gap-4 text-xs w-full md:w-auto">
-        <div class="text-center md:text-left">
-          <span class="text-[10px] text-slate-300 block uppercase">ClCr Calculado</span>
-          <strong id="topCrcl" class="text-cyan-300 text-xs">-- mL/min</strong>
-        </div>
-        <div class="text-center md:text-left">
-          <span class="text-[10px] text-amber-300 block uppercase">Critérios de Beers</span>
-          <strong id="topBeersCount" class="text-amber-400 text-xs">0</strong>
-        </div>
-
-        <div class="hidden md:block h-6 w-px bg-slate-600"></div>
-
-        <div class="flex items-center gap-2">
-          <div class="text-right">
-            <span id="lblUserName" class="block font-bold text-slate-100 text-[11px]">admin (ADMIN)</span>
-          </div>
-
-          <div id="adminActionButtons" class="hidden flex items-center gap-1.5">
-            <button onclick="toggleMetricsModal(true)"
-              class="bg-cyan-900/80 hover:bg-cyan-800 text-cyan-200 text-[10px] px-2 py-1 rounded font-semibold border border-cyan-700 flex items-center gap-1"
-              title="Acessar Indicadores Clínicos">
-              <i data-lucide="bar-chart-2" class="w-3 h-3"></i> Indicadores
-            </button>
-            <button onclick="toggleUsersModal(true)"
-              class="bg-sky-800 hover:bg-sky-700 text-white text-[10px] px-2 py-1 rounded font-semibold border border-sky-600 flex items-center gap-1"
-              title="Gerenciar Usuários">
-              <i data-lucide="users" class="w-3 h-3"></i> Usuários
-            </button>
-          </div>
-
-          <button onclick="executeLogout()" class="hidden md:flex text-slate-300 hover:text-rose-400 text-xs items-center gap-1 ml-2">
-            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Sair
-          </button>
-        </div>
-
-      </div>
-    </div>
-  </header>
-
-  <!-- CORPO PRINCIPAL -->
-  <main class="max-w-7xl w-full mx-auto p-3 sm:p-4 space-y-4 flex-1">
-    
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-      <!-- BLOCO 1 -->
-      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-3">
-        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">1. Paciente & Diagnósticos</h3>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Idade (Anos)</label>
-            <input type="number" id="inpAge" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="71" oninput="calculateCrCl(); saveState(); refreshUnifiedTable();">
-          </div>
-          <div>
-            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Setor</label>
-            <select id="selSector" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none font-bold text-slate-700" onchange="saveState()">
-              <option value="UPI (Enfermaria)">UPI (Enfermaria)</option>
-              <option value="UTI">UTI</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 pt-1">
-          <input type="checkbox" id="chkFallRisk" class="rounded text-emerald-600 focus:ring-0" onchange="saveState(); refreshUnifiedTable();">
-          <label for="chkFallRisk" class="text-[11px] font-bold text-blue-900 cursor-pointer">Risco Alto de Queda (Idoso / Avaliação)</label>
-        </div>
-
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Comorbidades / Condições Clínicas</label>
-          <input type="text" id="inpConditions" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Selecione ou adicione via atalhos..." oninput="saveState()">
-        </div>
-
-        <div class="flex flex-wrap gap-1 pt-1">
-          <button type="button" onclick="addCond('HAS')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ HAS</button>
-          <button type="button" onclick="addCond('DM')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DM</button>
-          <button type="button" onclick="addCond('DRC')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DRC</button>
-          <button type="button" onclick="addCond('Insuficiência Cardíaca')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ IC</button>
-          <button type="button" onclick="addCond('Demência')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ Demência</button>
-          <button type="button" onclick="addCond('Doença de Parkinson')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ Parkinson</button>
-          <button type="button" onclick="addCond('DPOC')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ DPOC</button>
-          <button type="button" onclick="addCond('IAM')" class="text-[10px] bg-slate-100 hover:bg-slate-200 border px-1.5 py-0.5 rounded text-slate-700">+ IAM</button>
-        </div>
-      </div>
-
-      <!-- BLOCO 2 -->
-      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-2.5">
-        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">2. Função Renal & Antropometria</h3>
-
-        <div class="grid grid-cols-3 gap-1.5">
-          <div>
-            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Creatinina (mg/dL)</label>
-            <input type="number" id="inpCreatinine" step="0.01" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 1.2" oninput="calculateCrCl(); saveState();">
-          </div>
-          <div>
-            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Peso (kg)</label>
-            <input type="number" id="inpWeight" step="0.1" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 70" oninput="calculateCrCl(); saveState();">
-          </div>
-          <div>
-            <label class="block text-[9px] font-bold text-slate-600 uppercase mb-0.5">Altura (cm)</label>
-            <input type="number" id="inpHeight" step="1" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" placeholder="Ex: 165" oninput="calculateCrCl(); saveState();">
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Sexo Biológico</label>
-          <select id="selGender" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none" onchange="calculateCrCl(); saveState();">
-            <option value="M">Masculino</option>
-            <option value="F">Feminino (x0.85)</option>
-          </select>
-        </div>
-
-        <div class="p-2 bg-slate-50 rounded border border-slate-200 text-center">
-          <span class="block text-[10px] text-slate-500 font-bold uppercase">Depuração Estimada</span>
-          <strong id="boxCrClResult" class="text-sm font-bold text-slate-800">-- mL/min</strong>
-          <span id="boxWeightNotes" class="block text-[10px] text-cyan-800 font-medium mt-0.5"></span>
-          <span id="boxCrclAlert" class="hidden block text-[10px] text-amber-800 bg-amber-50 border border-amber-200 p-1 rounded mt-1 font-semibold"></span>
-        </div>
-      </div>
-
-      <!-- BLOCO 3 -->
-      <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-2.5">
-        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">3. Entrada da Prescrição</h3>
-
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Prescrição Hospitalar (PDF)</label>
-          <input type="file" id="filePdf" accept="application/pdf" class="w-full text-[11px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" onchange="uploadPdf(event)">
-        </div>
-
-        <div>
-          <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Ou Cole a Prescrição</label>
-          <textarea id="txtRawPrescription" rows="2" class="w-full text-xs p-1.5 border border-slate-300 rounded bg-slate-50 outline-none font-mono" placeholder="Cole o texto da prescrição..."></textarea>
-        </div>
-
-        <button type="button" onclick="parseRawText()"
-          class="w-full py-1.5 bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold rounded shadow transition">
-          Extrair Prescrição Completa
-        </button>
-      </div>
-
-    </div>
-
-    <!-- BLOCO 4 -->
-    <div class="bg-white rounded-lg p-4 border border-slate-200 shadow-sm space-y-4">
-      <div class="flex justify-between items-center">
-        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">4. Medicamentos em Uso</h3>
-        <span id="lblUnifiedTotalMeds" class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">0 Medicamentos</span>
-      </div>
-
-      <div class="bg-slate-50 p-2.5 rounded border border-slate-200 space-y-1.5">
-        <span class="text-[10px] font-bold text-slate-600 uppercase block">+ Adição Rápida Manual</span>
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-          <input type="text" id="manualDrugName" class="sm:col-span-4 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Princípio Ativo ou Medicamento...">
-          <input type="text" id="manualDrugDose" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Dose (Ex: 25mg)">
-          <select id="manualDrugRoute" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none">
-            <option value="VO (Oral)">VO (Oral)</option>
-            <option value="IV (Endovenoso)">IV (Endovenoso)</option>
-            <option value="SC (Subcutâneo)">SC (Subcutâneo)</option>
-            <option value="IM (Intramuscular)">IM (Intramuscular)</option>
-            <option value="Tópico">Tópico</option>
-            <option value="Inalatório">Inalatório</option>
-          </select>
-          <input type="text" id="manualDrugFreq" class="sm:col-span-2 text-xs p-1.5 border rounded bg-white outline-none" placeholder="Posologia (Ex: 12/12h)">
-          
-          <div class="sm:col-span-1 flex items-center gap-1 justify-center bg-white p-1 rounded border border-slate-200">
-            <input type="checkbox" id="manualDrugIsSos" class="rounded text-cyan-600 focus:ring-0">
-            <label for="manualDrugIsSos" class="text-[10px] font-bold text-slate-700 cursor-pointer" title="Se Necessário / Quando Necessário">SN/QN</label>
-          </div>
-
-          <button type="button" onclick="addMedicationFromInputs()" class="sm:col-span-1 bg-[#0b2447] hover:bg-[#19376d] text-white text-xs font-bold rounded py-1.5 shadow">+ Inserir</button>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto border border-slate-200 rounded-lg">
-        <table class="w-full text-xs text-left min-w-[620px]">
-          <thead class="bg-slate-100 border-b border-slate-200 text-slate-700 uppercase text-[10px] font-bold">
-            <tr>
-              <th class="py-2.5 px-3">Medicamento / Princípio Ativo</th>
-              <th class="py-2.5 px-3">Dose / Via / Frequência</th>
-              <th class="py-2.5 px-3">Avaliação AGS Beers</th>
-              <th class="py-2.5 px-3 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody id="unifiedMedsTableBody" class="divide-y divide-slate-100">
-            <tr>
-              <td colspan="4" class="py-6 text-center text-slate-400">Nenhum medicamento na lista de triagem.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <button type="button" id="btnProcessScreening" onclick="processCompleteScreening()"
-        class="w-full py-3 bg-[#008170] hover:bg-[#005B41] text-white text-sm font-bold rounded-lg shadow-md transition flex items-center justify-center gap-2">
-        <i data-lucide="shield-alert" class="w-4 h-4"></i>
-        <span>Processar Triagem Farm-Beers (AGS Beers 2023)</span>
-      </button>
-
-    </div>
-
-    <!-- PARECER GERADO -->
-    <div id="screeningReportBox" class="hidden bg-white rounded-lg p-5 border border-slate-200 shadow-sm space-y-4">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
-        <div>
-          <span class="text-[10px] font-bold uppercase text-emerald-700 tracking-wider">Parecer Farmacoterapêutico de Beers</span>
-          <h2 class="text-base font-bold text-slate-900">Plano de Intervenção Clínica e Desprescrição</h2>
-        </div>
-        
-        <div class="flex items-center gap-2">
-          <span id="reportBadgeSummary" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-            0 Alertas Identificados
-          </span>
-
-          <button onclick="copySoapNote()" class="no-print bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow transition" title="Copiar evolução formatada para o prontuário">
-            <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar para Prontuário
-          </button>
-          <button onclick="window.print()" class="no-print bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow transition" title="Imprimir parecer em PDF">
-            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Imprimir / PDF
-          </button>
-        </div>
-      </div>
-
-      <!-- CARD ACB SCORE -->
-      <div id="boxAcbSummary" class="p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-start gap-3">
-        <div class="p-2 bg-purple-100 text-purple-700 rounded font-bold text-xs uppercase flex items-center gap-1">
-          <i data-lucide="brain" class="w-4 h-4"></i>
-          <span>ACB Score</span>
-        </div>
-        <div class="text-xs">
-          <strong id="lblAcbTotalScore" class="text-purple-900 text-sm block">0 Pontos</strong>
-          <p id="lblAcbInterpretation" class="text-purple-800 mt-0.5">Sem risco anticolinérgico identificado.</p>
-        </div>
-      </div>
-
-      <div id="reportAlertsList" class="space-y-3"></div>
-    </div>
-
-  </main>
-
-  <script>
-    const STORAGE_KEY = "farmbeers_active_state";
-    const USER_KEY = "farmbeers_auth_data";
-
-    let medicationsList = [];
-    let calculatedCrCl = null;
-    let crclClinicalNote = "";
-    let currentUser = null;
-    let pingInterval = null;
-    let pendingPdfMedications = [];
-    let lastGeneratedAlerts = [];
-    let lastAcbSummary = "";
-
-    document.addEventListener("DOMContentLoaded", () => {
-      lucide.createIcons();
-      verifyAuth();
-      restoreSavedState();
-    });
-
-    window.addEventListener("beforeunload", () => {
-      if (currentUser) {
-        navigator.sendBeacon("/api/v1/auth/logout", JSON.stringify({ username: currentUser.username }));
-      }
-    });
-
-    function toggleManualModal(show) {
-      const modal = document.getElementById("manualModal");
-      if (show) {
-        modal.classList.remove("hidden");
-        lucide.createIcons();
-      } else {
-        modal.classList.add("hidden");
-      }
-    }
-
-    function verifyAuth() {
-      const stored = localStorage.getItem(USER_KEY);
-      if (stored) {
-        currentUser = JSON.parse(stored);
-        document.getElementById("loginModal").classList.add("hidden");
-        document.getElementById("lblUserName").innerText = `${currentUser.username} (${currentUser.role.toUpperCase()})`;
-        
-        if (currentUser.role === "admin") {
-          document.getElementById("adminActionButtons").classList.remove("hidden");
-        }
-
-        if (pingInterval) clearInterval(pingInterval);
-        pingInterval = setInterval(() => {
-          fetch("/api/v1/auth/ping", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ username: currentUser.username })
-          });
-        }, 25000);
-
-      } else {
-        document.getElementById("loginModal").classList.remove("hidden");
-      }
-    }
-
-    async function executeLogin() {
-      const username = document.getElementById("txtUsername").value.trim();
-      const password = document.getElementById("txtPass").value.trim();
-      const err = document.getElementById("loginErrMsg");
-
-      if (!username || !password) {
-        err.innerText = "Preencha o usuário e a senha.";
-        err.classList.remove("hidden");
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/v1/auth/login", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Erro de login");
-        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        document.getElementById("loginModal").classList.add("hidden");
-        verifyAuth();
-      } catch (e) {
-        err.innerText = e.message;
-        err.classList.remove("hidden");
-      }
-    }
-
-    async function executeLogout() {
-      if (currentUser) {
-        await fetch("/api/v1/auth/logout", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ username: currentUser.username })
-        });
-      }
-      localStorage.removeItem(USER_KEY);
-      location.reload();
-    }
-
-    function toggleUsersModal(show) {
-      const m = document.getElementById("usersAdminModal");
-      if (show) {
-        m.classList.remove("hidden");
-        loadUsersTable();
-      } else {
-        m.classList.add("hidden");
-      }
-    }
-
-    async function loadUsersTable() {
-      const tbody = document.getElementById("usersTableBody");
-      try {
-        const res = await fetch("/api/v1/admin/users");
-        const users = await res.json();
-        tbody.innerHTML = "";
-
-        users.forEach(u => {
-          const statusBadge = u.is_online
-            ? `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online</span>`
-            : `<span class="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Offline</span>`;
-
-          const accountBadge = u.is_active
-            ? `<span class="text-[10px] font-bold text-emerald-600">Ativo</span>`
-            : `<span class="text-[10px] font-bold text-rose-600">Bloqueado</span>`;
-
-          const actionButtons = u.username === "admin"
-            ? `<span class="text-[10px] text-slate-400 italic">Padrão</span>`
-            : `
-              <button onclick="toggleUserStatus(${u.id})" class="text-[10px] font-bold px-2 py-0.5 rounded border ${u.is_active ? 'text-amber-700 border-amber-300 hover:bg-amber-50' : 'text-emerald-700 border-emerald-300 hover:bg-emerald-50'}">
-                ${u.is_active ? 'Bloquear' : 'Desbloquear'}
-              </button>
-              <button onclick="deleteUser(${u.id})" class="text-[10px] font-bold px-2 py-0.5 rounded border text-rose-700 border-rose-300 hover:bg-rose-50 ml-1">
-                Excluir
-              </button>
-            `;
-
-          tbody.innerHTML += `
-            <tr class="hover:bg-slate-50">
-              <td class="py-2 font-bold text-slate-800">${u.username}</td>
-              <td class="py-2 capitalize text-slate-600">${u.role}</td>
-              <td class="py-2">${statusBadge}</td>
-              <td class="py-2">${accountBadge}</td>
-              <td class="py-2 text-right">${actionButtons}</td>
-            </tr>
-          `;
-        });
-      } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-rose-500">Erro ao carregar lista de usuários.</td></tr>`;
-      }
-    }
-
-    async function handleCreateUser(e) {
-      e.preventDefault();
-      const msg = document.getElementById("createUserMsg");
-      const payload = {
-        username: document.getElementById("newUsername").value.trim(),
-        password: document.getElementById("newUserPass").value.trim(),
-        role: document.getElementById("newUserRole").value
-      };
-
-      try {
-        const res = await fetch("/api/v1/admin/users", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Falha ao cadastrar.");
-
-        msg.className = "text-xs p-1.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 block";
-        msg.innerText = "Usuário cadastrado com sucesso!";
-        document.getElementById("newUsername").value = "";
-        document.getElementById("newUserPass").value = "";
-        loadUsersTable();
-        setTimeout(() => msg.classList.add("hidden"), 2500);
-      } catch (err) {
-        msg.className = "text-xs p-1.5 rounded bg-rose-50 text-rose-800 border border-rose-200 block";
-        msg.innerText = err.message;
-      }
-    }
-
-    async function toggleUserStatus(userId) {
-      if (!confirm("Deseja alterar o status de acesso deste usuário?")) return;
-      await fetch(`/api/v1/admin/users/${userId}/toggle-status`, { method: "PATCH" });
-      loadUsersTable();
-    }
-
-    async function deleteUser(userId) {
-      if (!confirm("Tem certeza que deseja excluir este usuário permanentemente?")) return;
-      await fetch(`/api/v1/admin/users/${userId}`, { method: "DELETE" });
-      loadUsersTable();
-    }
-
-    function toggleMetricsModal(show) {
-      const m = document.getElementById("metricsModal");
-      if (show) {
-        m.classList.remove("hidden");
-        loadMetricsData();
-        if (window.lucide) lucide.createIcons();
-      } else {
-        m.classList.add("hidden");
-      }
-    }
-
-    function clearMetricsFilter() {
-      const elDay = document.getElementById("filterDay");
-      const elMonth = document.getElementById("filterMonth");
-      const elYear = document.getElementById("filterYear");
-      if (elDay) elDay.value = "";
-      if (elMonth) elMonth.value = "";
-      if (elYear) elYear.value = "";
-      loadMetricsData();
-    }
-
-    async function loadMetricsData() {
-      const day = (document.getElementById("filterDay")?.value || "").trim();
-      const month = (document.getElementById("filterMonth")?.value || "").trim();
-      const year = (document.getElementById("filterYear")?.value || "").trim();
-
-      const params = new URLSearchParams();
-      if (year && year !== "") params.append("year", year);
-      if (month && month !== "") params.append("month", month);
-      if (day && day !== "") params.append("day", day);
-
-      const qs = params.toString() ? `?${params.toString()}` : "";
-
-      try {
-        const res = await fetch(`/api/v1/admin/metrics${qs}`);
-        if (!res.ok) throw new Error("Falha HTTP " + res.status);
-        const data = await res.json();
-
-        document.getElementById("metricTotalPatients").innerText = data.total_patients || 0;
-        document.getElementById("metricTotalUPI").innerText = data.count_upi || 0;
-        document.getElementById("metricTotalUTI").innerText = data.count_uti || 0;
-        document.getElementById("metricTotalBeersAlerts").innerText = data.total_beers_alerts || 0;
-        document.getElementById("metricAcceptanceRate").innerText = `${data.acceptance_rate || 0}%`;
-
-        const tbody = document.getElementById("top5TableBody");
-        if (tbody) {
-          tbody.innerHTML = "";
-          if (data.top_5_beers && data.top_5_beers.length > 0) {
-            data.top_5_beers.forEach(item => {
-              tbody.innerHTML += `
-                <tr class="hover:bg-slate-50">
-                  <td class="py-2 px-2 font-bold text-slate-800">${item.drug}</td>
-                  <td class="py-2 px-2 text-right font-extrabold text-amber-600">${item.count}</td>
-                </tr>
-              `;
-            });
-          } else {
-            tbody.innerHTML = `<tr><td colspan="2" class="py-3 text-center text-slate-400">Nenhum registro encontrado.</td></tr>`;
-          }
-        }
-      } catch (err) {
-        console.error("Erro ao carregar dados de indicadores:", err);
-      }
-    }
-
-    function calculateCrCl() {
-      const age = parseFloat(document.getElementById("inpAge").value);
-      const rawScr = parseFloat(document.getElementById("inpCreatinine").value);
-      const weight = parseFloat(document.getElementById("inpWeight").value);
-      const height = parseFloat(document.getElementById("inpHeight").value);
-      const gender = document.getElementById("selGender").value;
-
-      const alertBox = document.getElementById("boxCrclAlert");
-      const notesBox = document.getElementById("boxWeightNotes");
-      alertBox.classList.add("hidden");
-      notesBox.innerText = "";
-      crclClinicalNote = "";
-
-      if (age > 0 && rawScr > 0 && weight > 0) {
-        let scrUsed = rawScr;
-        if (rawScr < 0.6) {
-          scrUsed = 0.6;
-          alertBox.innerText = `Atenção: Creatinina sérica (${rawScr} mg/dL) baixa. Aplicado piso protetor de 0,6 mg/dL para mitigar superestimação por sarcopenia.`;
-          alertBox.classList.remove("hidden");
-          crclClinicalNote = `Creatinina arredondada de ${rawScr} para 0.6 mg/dL por sarcopenia.`;
-        }
-
-        let weightUsed = weight;
-        let weightType = "Peso Real";
-
-        if (height > 100) {
-          const heightM = height / 100;
-          const bmi = weight / (heightM * heightM);
-          
-          const baseHeight = 152.4;
-          const inchesOver = Math.max(0, (height - baseHeight) / 2.54);
-          let ibw = gender === "M" ? 50 + (2.3 * inchesOver) : 45.5 + (2.3 * inchesOver);
-
-          if (bmi >= 30 || weight > (ibw * 1.2)) {
-            weightUsed = ibw + 0.4 * (weight - ibw);
-            weightType = `Peso Ajustado (${Math.round(weightUsed * 10) / 10} kg | IMC: ${Math.round(bmi * 10) / 10})`;
-          } else {
-            weightType = `Peso Real (IMC: ${Math.round(bmi * 10) / 10})`;
-          }
-        }
-
-        let crcl = ((140 - age) * weightUsed) / (72 * scrUsed);
-        if (gender === "F") crcl *= 0.85;
-
-        calculatedCrCl = Math.round(crcl * 10) / 10;
-        document.getElementById("boxCrClResult").innerText = `${calculatedCrCl} mL/min`;
-        document.getElementById("topCrcl").innerText = `${calculatedCrCl} mL/min`;
-        notesBox.innerText = `Base: ${weightType}`;
-      } else {
-        calculatedCrCl = null;
-        document.getElementById("boxCrClResult").innerText = `-- mL/min`;
-        document.getElementById("topCrcl").innerText = `-- mL/min`;
-      }
-    }
-
-    function addCond(cond) {
-      const inp = document.getElementById("inpConditions");
-      const current = inp.value.trim();
-      inp.value = current ? `${current}, ${cond}` : cond;
-      saveState();
-    }
-
-    function addMedicationFromInputs() {
-      const name = document.getElementById("manualDrugName").value.trim();
-      const dose = document.getElementById("manualDrugDose").value.trim();
-      const route = document.getElementById("manualDrugRoute").value;
-      const freq = document.getElementById("manualDrugFreq").value.trim();
-      const isSos = document.getElementById("manualDrugIsSos").checked;
-
-      if (!name) return alert("Informe o nome do medicamento.");
-
-      medicationsList.push({ name, dose, route, frequency: freq, is_sos: isSos });
-      document.getElementById("manualDrugName").value = "";
-      document.getElementById("manualDrugDose").value = "";
-      document.getElementById("manualDrugFreq").value = "";
-      document.getElementById("manualDrugIsSos").checked = false;
-      refreshUnifiedTable();
-      saveState();
-    }
-
-    function removeMedication(index) {
-      medicationsList.splice(index, 1);
-      refreshUnifiedTable();
-      saveState();
-    }
-
-    // AVALIAÇÃO VISUAL RÁPIDA: persist = false (NÃO DUPLICA PACIENTE NO BANCO)
-    async function refreshUnifiedTable() {
-      const tbody = document.getElementById("unifiedMedsTableBody");
-      document.getElementById("lblUnifiedTotalMeds").innerText = `${medicationsList.length} Medicamento(s)`;
-
-      if (medicationsList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-400">Nenhum medicamento na lista de triagem.</td></tr>`;
-        document.getElementById("topBeersCount").innerText = "0";
-        return;
-      }
-
-      let quickHtml = "";
-      medicationsList.forEach((m, idx) => {
-        let parts = [m.dose, m.route, m.frequency].filter(Boolean).join(" ");
-        if (m.is_sos && !parts.includes("SN/QN")) {
-          parts = parts ? `${parts} [SN/QN]` : "[SN/QN]";
-        }
-        quickHtml += `
-          <tr class="hover:bg-slate-50">
-            <td class="py-2.5 px-3 font-bold text-slate-800">${m.name}</td>
-            <td class="py-2.5 px-3 text-slate-600">${parts || "VO (Oral)"}</td>
-            <td class="py-2.5 px-3" id="cellTag_${idx}"><span class="text-slate-400 text-[10px]">Avaliando...</span></td>
-            <td class="py-2.5 px-3 text-right">
-              <button onclick="removeMedication(${idx})" class="text-rose-600 hover:text-rose-800 font-bold text-[11px]">Remover</button>
-            </td>
-          </tr>
-        `;
-      });
-      tbody.innerHTML = quickHtml;
-
-      const payload = {
-        age: parseInt(document.getElementById("inpAge").value) || 70,
-        sector: document.getElementById("selSector").value,
-        fall_risk: document.getElementById("chkFallRisk").checked,
-        conditions: document.getElementById("inpConditions").value.split(/[,]+/).map(c => c.trim()).filter(Boolean),
-        crcl_ml_min: calculatedCrCl,
-        crcl_notes: crclClinicalNote,
-        medications: medicationsList,
-        persist: false // <<< NÃO GRAVA NO BANCO NA PRÉVIA
-      };
-
-      try {
-        const res = await fetch("/api/v1/screen", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-
-        document.getElementById("topBeersCount").innerText = data.total_beers_alerts;
-
-        data.medication_rows.forEach((row, idx) => {
-          const cell = document.getElementById(`cellTag_${idx}`);
-          if (cell) {
-            cell.innerHTML = row.is_beers
-              ? `<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[10px] font-bold">
-                   <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i> ${row.alert_tag}
-                 </span>`
-              : `<span class="text-slate-400 text-[10px]">Sem alertas AGS</span>`;
-          }
-        });
-        lucide.createIcons();
-      } catch (e) {
-        console.error("Erro na verificação de Beers.");
-      }
-    }
-
-    function saveState() {
-      const state = {
-        age: document.getElementById("inpAge").value,
-        sector: document.getElementById("selSector").value,
-        fall_risk: document.getElementById("chkFallRisk").checked,
-        conditions: document.getElementById("inpConditions").value,
-        creat: document.getElementById("inpCreatinine").value,
-        weight: document.getElementById("inpWeight").value,
-        height: document.getElementById("inpHeight").value,
-        gender: document.getElementById("selGender").value,
-        meds: medicationsList
-      };
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-
-    function restoreSavedState() {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const s = JSON.parse(saved);
-        document.getElementById("inpAge").value = s.age || "";
-        document.getElementById("selSector").value = s.sector || "UPI (Enfermaria)";
-        document.getElementById("chkFallRisk").checked = !!s.fall_risk;
-        document.getElementById("inpConditions").value = s.conditions || "";
-        document.getElementById("inpCreatinine").value = s.creat || "";
-        document.getElementById("inpWeight").value = s.weight || "";
-        document.getElementById("inpHeight").value = s.height || "";
-        document.getElementById("selGender").value = s.gender || "M";
-        medicationsList = s.meds || [];
-        calculateCrCl();
-        refreshUnifiedTable();
-      }
-    }
-
-    function resetFullApp() {
-      sessionStorage.removeItem(STORAGE_KEY);
-      medicationsList = [];
-      document.getElementById("inpAge").value = "";
-      document.getElementById("chkFallRisk").checked = false;
-      document.getElementById("inpConditions").value = "";
-      document.getElementById("inpCreatinine").value = "";
-      document.getElementById("inpWeight").value = "";
-      document.getElementById("inpHeight").value = "";
-      document.getElementById("txtRawPrescription").value = "";
-      document.getElementById("filePdf").value = "";
-      calculateCrCl();
-      refreshUnifiedTable();
-      document.getElementById("screeningReportBox").classList.add("hidden");
-    }
-
-    async function uploadPdf(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/v1/prescription/extract-pdf", { method: "POST", body: fd });
-      if (res.ok) {
-        const data = await res.json();
-        pendingPdfMedications = data.items || [];
-        if (pendingPdfMedications.length === 0) {
-          alert("Nenhum medicamento ativo detectado no PDF.");
-          return;
-        }
-        openPdfReviewModal();
-      }
-    }
-
-    function openPdfReviewModal() {
-      const list = document.getElementById("pdfExtractedChecklist");
-      list.innerHTML = "";
-      pendingPdfMedications.forEach((item, i) => {
-        const snLabel = item.is_sos ? '<span class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded font-bold ml-1">SN/QN</span>' : '';
-        const details = [item.dose, item.route, item.frequency].filter(Boolean).join(" ");
-        list.innerHTML += `
-          <label class="flex items-center justify-between p-2 hover:bg-slate-100 rounded cursor-pointer border border-slate-200">
-            <div class="flex items-center gap-2">
-              <input type="checkbox" id="pdfCheck_${i}" value="${item.name}" checked class="rounded text-cyan-600 focus:ring-0">
-              <div>
-                <span class="font-bold text-slate-800 text-xs">${item.name}</span>
-                ${snLabel}
-                <div class="text-[11px] text-slate-500">${details || "VO (Oral)"}</div>
-              </div>
+            <!-- AQUI: Substituição da Logo -->
+            <!-- Substitua 'image_c37989.png' pelo caminho correto se necessário,
+                 mas como você subiu com esse nome, deixei assim. Idealmente, renomeie para 'logo.png' -->
+            <div>
+                <img src="image_c37989.png" alt="Logo Radar Beers" style="height: 45px; margin-right: 10px;">
             </div>
-          </label>
-        `;
-      });
-      togglePdfReviewModal(true);
-      lucide.createIcons();
-    }
-
-    function togglePdfReviewModal(show) {
-      const m = document.getElementById("pdfReviewModal");
-      if (show) m.classList.remove("hidden");
-      else m.classList.add("hidden");
-    }
-
-    function confirmPdfMedications() {
-      let count = 0;
-      pendingPdfMedications.forEach((item, i) => {
-        const chk = document.getElementById(`pdfCheck_${i}`);
-        if (chk && chk.checked) {
-          if (!medicationsList.some(m => m.name.toLowerCase() === item.name.toLowerCase())) {
-            medicationsList.push({
-              name: item.name,
-              dose: item.dose || "",
-              route: item.route || "VO (Oral)",
-              frequency: item.frequency || "",
-              is_sos: !!item.is_sos
-            });
-            count++;
-          }
-        }
-      });
-      togglePdfReviewModal(false);
-      refreshUnifiedTable();
-      saveState();
-      alert(`${count} medicamento(s) confirmado(s) e inserido(s) na triagem!`);
-    }
-
-    function parseRawText() {
-      const raw = document.getElementById("txtRawPrescription").value;
-      if (!raw.trim()) return alert("Cole o texto da prescrição primeiro.");
-      const lines = raw.split(/[\n;]+/).map(l => l.trim()).filter(Boolean);
-      lines.forEach(l => {
-        const isSn = /sn|qn|sos|necess[aá]rio/i.test(l);
-        medicationsList.push({ name: l, dose: "", route: "VO (Oral)", frequency: isSn ? "SN" : "", is_sos: isSn });
-      });
-      document.getElementById("txtRawPrescription").value = "";
-      refreshUnifiedTable();
-      saveState();
-    }
-
-    // PROCESSAMENTO DEFINITIVO: persist = true (GRAVA EXATAMENTE 1 PACIENTE NO BANCO)
-    async function processCompleteScreening() {
-      if (medicationsList.length === 0) {
-        alert("Insira ao menos um medicamento para avaliar.");
-        return;
-      }
-      
-      const ageInput = document.getElementById("inpAge").value;
-      const ageVal = parseInt(ageInput) || 70;
-      const currentSector = document.getElementById("selSector").value || "UPI (Enfermaria)";
-
-      const btn = document.getElementById("btnProcessScreening");
-      btn.disabled = true;
-      btn.innerHTML = `<span class="animate-spin mr-2">⏳</span> Processando regras AGS Beers...`;
-
-      const payload = {
-        age: ageVal,
-        sector: currentSector,
-        fall_risk: document.getElementById("chkFallRisk").checked,
-        conditions: document.getElementById("inpConditions").value.split(/[,]+/).map(c => c.trim()).filter(Boolean),
-        crcl_ml_min: calculatedCrCl,
-        crcl_notes: crclClinicalNote,
-        medications: medicationsList,
-        persist: true // <<< GRAVA NO BANCO APENAS AQUI!
-      };
-
-      try {
-        const res = await fetch("/api/v1/screen", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Falha de resposta do servidor (${res.status})`);
-        }
-
-        const data = await res.json();
-        lastGeneratedAlerts = data.alerts || [];
-
-        const box = document.getElementById("screeningReportBox");
-        const list = document.getElementById("reportAlertsList");
-        const badge = document.getElementById("reportBadgeSummary");
-
-        const acbScore = data.acb_score || 0;
-        const acbInterp = data.acb_interpretation || "Neutro";
-        lastAcbSummary = `${acbScore} pontos (${acbInterp})`;
-        document.getElementById("lblAcbTotalScore").innerText = `${acbScore} Ponto${acbScore !== 1 ? 's' : ''}`;
-        document.getElementById("lblAcbInterpretation").innerText = acbInterp;
-
-        box.classList.remove("hidden");
-        badge.innerText = `${data.total_beers_alerts || lastGeneratedAlerts.length} Alertas Identificados`;
-        list.innerHTML = "";
-
-        if (lastGeneratedAlerts.length === 0) {
-          list.innerHTML = `
-            <div class="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-xs flex items-center gap-2">
-              <span>✓</span> Prescrição validada. Nenhum critério de Beers violado para o perfil clínico informado.
+            <div>
+                <h1 class="logo-text" style="font-size: 1.2rem; font-weight: bold; color: white;">Radar Beers</h1>
+                <div class="logo-subtext" style="font-size: 0.7rem; color: #a0aec0;">TRIAGEM FARMACÊUTICA</div>
             </div>
-          `;
-        } else {
-          let alertsHtml = "";
-          lastGeneratedAlerts.forEach((a, i) => {
-            const drugName = a.drug || a.drug_name || "Medicamento";
-            const axisName = a.axis || "AGS Beers 2023";
-            const recText = a.recommendation || "Reavaliar uso em idosos.";
-            const ratText = a.rationale || "Medicamento potencialmente inapropriado pela diretriz AGS Beers.";
-            const isSn = a.is_sos || false;
-            const acbPts = a.acb_score || 0;
-            const alertId = (a.id !== undefined && a.id !== null) ? a.id : null;
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="text-sm">
+                <span class="text-gray-400">CLCR CALCULADO</span><br>
+                <span id="header-crcl" class="font-bold">-- mL/min</span>
+            </div>
+            <div class="text-sm">
+                <span class="text-gray-400">CRITÉRIOS DE BEERS</span><br>
+                <span id="header-alerts" class="font-bold text-yellow-400">0</span>
+            </div>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Indicadores
+            </button>
+            <div class="text-sm font-medium">admin (ADMIN)</div>
+             <button class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm flex items-center gap-2">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                Sair
+            </button>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <div class="container mx-auto p-4 space-y-4">
+        
+        <!-- Grid Superior -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            const snTag = isSn ? '<span class="bg-amber-200 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded ml-2">Regime: SN / QN</span>' : '';
-            const acbTag = acbPts > 0 ? `<span class="bg-purple-100 text-purple-900 border border-purple-300 text-[10px] font-bold px-2 py-0.5 rounded ml-1">ACB: +${acbPts}</span>` : '';
-
-            const taperingHtml = a.tapering
-              ? `<div class="bg-amber-50/80 p-2.5 rounded border border-amber-200 mt-2">
-                   <strong class="text-amber-900 block text-[11px] uppercase tracking-wider mb-0.5">
-                     Plano Prático de Desprescrição (Tapering):
-                   </strong>
-                   <p class="text-amber-800 text-xs">${a.tapering}</p>
-                 </div>`
-              : '';
-
-            alertsHtml += `
-              <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 shadow-sm">
-                <div class="flex justify-between items-center font-bold">
-                  <span class="text-rose-700 text-sm">
-                    ⚠ ${drugName} ${snTag} ${acbTag}
-                  </span>
-                  <span class="text-[10px] bg-slate-200 text-slate-800 px-2 py-0.5 rounded font-mono">${axisName}</span>
+            <!-- 1. Paciente & Diagnósticos -->
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <h2 class="text-md font-bold mb-4">1. PACIENTE & DIAGNÓSTICOS</h2>
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">IDADE (ANOS)</label>
+                        <input type="number" id="age" class="form-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="71" value="71">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">SETOR</label>
+                        <!-- AQUI: Setor travado em Enfermaria -->
+                        <select id="sector" class="form-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" disabled>
+                            <option value="Enfermaria" selected>Enfermaria</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="text-slate-800"><strong>Conduta Recomendada:</strong> ${recText}</div>
-                <div class="text-slate-600 bg-white p-2 rounded border border-slate-100"><strong>Racional Clínico:</strong> ${ratText}</div>
-                ${taperingHtml}
                 
-                <div class="mt-2.5 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-[10px] font-bold uppercase text-slate-500">Desfecho com a Equipe Médica:</span>
-                  <div class="flex flex-wrap items-center gap-1.5" id="outcomeContainer_${i}">
-                    <button type="button" onclick="setAlertOutcome(${alertId}, ${i}, 'accepted')" 
-                      class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded text-[10px] font-bold flex items-center gap-1 transition">
-                      ✓ Aceita
-                    </button>
-                    <button type="button" onclick="setAlertOutcome(${alertId}, ${i}, 'rejected')" 
-                      class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 rounded text-[10px] font-bold flex items-center gap-1 transition">
-                      ✗ Recusada
-                    </button>
-                    <button type="button" onclick="setAlertOutcome(${alertId}, ${i}, 'not_applicable')" 
-                      class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 rounded text-[10px] font-bold flex items-center gap-1 transition">
-                      ⚪ Não se Aplica
-                    </button>
-                  </div>
+                <div class="flex items-center mb-4">
+                    <input id="fall_risk" type="checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="fall_risk" class="ml-2 text-sm font-medium text-gray-900">Risco Alto de Queda (Idoso / Avaliação)</label>
                 </div>
-              </div>
+
+                <div class="mb-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">COMORBIDADES / CONDIÇÕES CLÍNICAS</label>
+                    <input type="text" id="conditions-input" class="form-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Selecione ou adicione via atalhos...">
+                </div>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ HAS</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ DM</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ DRC</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ IC</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ Demência</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ Parkinson</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ DPOC</button>
+                    <button class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-semibold py-1 px-2 border border-gray-300 rounded shadow-sm">+ IAM</button>
+                </div>
+            </div>
+
+            <!-- 2. Função Renal & Antropometria -->
+            <div class="bg-white p-4 rounded-lg shadow-sm">
+                <h2 class="text-md font-bold mb-4">2. FUNÇÃO RENAL & ANTROPOMETRIA</h2>
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">CREATININA (MG/DL)</label>
+                        <input type="text" id="creatinina" class="form-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2" placeholder="Ex: 1.2">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">PESO (KG)</label>
+                        <input type="text" id="peso" class="form-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2" placeholder="Ex: 70">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">ALTURA (CM)</label>
+                        <input type="text" id="altura" class="form-input bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2" placeholder="Ex: 165">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">SEXO BIOLÓGICO</label>
+                    <select id="sexo" class="form-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                        <option value="M">Masculino</option>
+                        <option value="F">Feminino</option>
+                    </select>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+                    <p class="text-xs font-medium text-gray-500 uppercase">Depuração Estimada</p>
+                    <p id="calc-crcl" class="text-xl font-bold text-gray-800">-- mL/min</p>
+                </div>
+            </div>
+
+            <!-- 3. Entrada da Prescrição -->
+            <div class="bg-white p-4 rounded-lg shadow-sm flex flex-col justify-between">
+                <div>
+                     <h2 class="text-md font-bold mb-4">3. ENTRADA DA PRESCRIÇÃO</h2>
+                     <label class="block text-sm font-medium text-gray-700 mb-1">PRESCRIÇÃO HOSPITALAR (PDF)</label>
+                     
+                     <div class="flex items-center gap-2 mb-3">
+                        <label class="block">
+                            <span class="sr-only">Escolher arquivo</span>
+                            <input type="file" id="pdf-upload" accept="application/pdf" class="block w-full text-sm text-slate-500
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100
+                            "/>
+                        </label>
+                     </div>
+
+                     <label class="block text-sm font-medium text-gray-700 mb-1">OU COLE A PRESCRIÇÃO</label>
+                     <textarea id="text-upload" rows="3" class="form-textarea bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 mb-3" placeholder="Cole o texto da prescrição..."></textarea>
+                </div>
+                
+                <button id="btn-extract" class="w-full bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold py-2.5 px-4 rounded-lg text-sm transition-colors">
+                    Extrair Prescrição Completa
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. Medicamentos em Uso -->
+        <div class="bg-white p-4 rounded-lg shadow-sm">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h2 class="text-md font-bold">4. MEDICAMENTOS EM USO</h2>
+                <span class="bg-gray-100 text-gray-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded border border-gray-300">0 Medicamentos</span>
+            </div>
+            
+            <!-- Adição Manual -->
+            <div class="flex flex-wrap gap-2 mb-4">
+                <input type="text" id="manual-med-name" placeholder="Princípio Ativo ou Medicamento..." class="flex-grow min-w-[200px] bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2">
+                <input type="text" id="manual-med-dose" placeholder="Dose (Ex: 25mg)" class="w-32 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2">
+                <select id="manual-med-route" class="w-32 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2">
+                    <option>VO (Oral)</option>
+                    <option>IV (Endovenoso)</option>
+                    <option>IM (Intramuscular)</option>
+                    <option>SC (Subcutâneo)</option>
+                    <option>Inalatório</option>
+                    <option>Tópico</option>
+                </select>
+                <input type="text" id="manual-med-freq" placeholder="Posologia (Ex: 12/12h)" class="w-40 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2">
+                <label class="flex items-center gap-1 text-sm bg-gray-50 border border-gray-300 px-3 rounded-lg">
+                    <input type="checkbox" id="manual-med-sos" class="rounded text-blue-600 focus:ring-blue-500"> SN/QN
+                </label>
+                <button id="btn-add-manual" class="bg-[#0f172a] hover:bg-[#1e293b] text-white font-bold py-2 px-4 rounded-lg text-sm transition-colors">
+                    + Inserir
+                </button>
+            </div>
+
+            <!-- Tabela de Medicamentos -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-gray-500">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-y border-gray-200">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 w-1/3">MEDICAMENTO / PRINCÍPIO ATIVO</th>
+                            <th scope="col" class="px-4 py-3 w-1/4">DOSE / VIA / FREQUÊNCIA</th>
+                            <th scope="col" class="px-4 py-3 w-1/4">AVALIAÇÃO AGS BEERS</th>
+                            <th scope="col" class="px-4 py-3 text-right">AÇÕES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="med-table-body">
+                        <tr class="border-b">
+                            <td colspan="4" class="px-4 py-8 text-center text-gray-400">Nenhum medicamento na lista de triagem.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-4 flex justify-end gap-3">
+                 <button id="btn-clear" class="text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 font-medium rounded-lg text-sm px-5 py-2.5">Limpar Lista</button>
+                 <button id="btn-process" class="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Processar Triagem Completa
+                 </button>
+            </div>
+        </div>
+        
+        <!-- Área de Resultados (Oculta por padrão) -->
+        <div id="results-area" class="hidden bg-white p-4 rounded-lg shadow-sm border border-blue-100">
+            <h2 class="text-lg font-bold text-[#0f172a] mb-4 border-b pb-2">RESULTADOS DA TRIAGEM</h2>
+            <div id="results-content" class="space-y-4">
+                <!-- Conteúdo gerado dinamicamente -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Scripts de Lógica Básica do Frontend (Exemplo) -->
+    <script>
+        // Variáveis globais para armazenar o estado
+        let medicationsList = [];
+        let extractedItemsCache = [];
+
+        // Elementos do DOM
+        const btnExtract = document.getElementById('btn-extract');
+        const pdfUpload = document.getElementById('pdf-upload');
+        const textUpload = document.getElementById('text-upload');
+        const medTableBody = document.getElementById('med-table-body');
+        const btnAddManual = document.getElementById('btn-add-manual');
+        const btnProcess = document.getElementById('btn-process');
+        const resultsArea = document.getElementById('results-area');
+        const resultsContent = document.getElementById('results-content');
+        
+        // Elementos de Função Renal
+        const inputCreatinina = document.getElementById('creatinina');
+        const inputPeso = document.getElementById('peso');
+        const inputIdade = document.getElementById('age');
+        const inputSexo = document.getElementById('sexo');
+        const calcCrclDisplay = document.getElementById('calc-crcl');
+        const headerCrcl = document.getElementById('header-crcl');
+
+        // URL base da API (Ajustar para o Render em produção)
+        // const API_BASE_URL = 'https://radar-beers-backend.onrender.com/api/v1'; // Substituir pela sua URL real
+        const API_BASE_URL = '/api/v1'; // Assume que o frontend está servido pelo backend
+
+        // === 1. FUNÇÃO RENAL (Cockcroft-Gault) ===
+        function calculateCrCl() {
+            const scrStr = inputCreatinina.value.replace(',', '.');
+            const weightStr = inputPeso.value.replace(',', '.');
+            const ageStr = inputIdade.value;
+            const sex = inputSexo.value;
+
+            const scr = parseFloat(scrStr);
+            const weight = parseFloat(weightStr);
+            const age = parseInt(ageStr, 10);
+
+            if (isNaN(scr) || isNaN(weight) || isNaN(age) || scr <= 0 || weight <= 0 || age <= 0) {
+                calcCrclDisplay.textContent = "-- mL/min";
+                headerCrcl.textContent = "-- mL/min";
+                return null;
+            }
+
+            // Piso de sarcopenia
+            let adjustedScr = scr;
+            if (scr < 0.6) {
+                adjustedScr = 0.6;
+            }
+
+            let crcl = ((140 - age) * weight) / (72 * adjustedScr);
+            if (sex === 'F') {
+                crcl *= 0.85;
+            }
+
+            const crclFormatted = crcl.toFixed(1);
+            
+            let colorClass = "text-green-600";
+            if (crcl < 30) colorClass = "text-red-600";
+            else if (crcl < 60) colorClass = "text-yellow-600";
+
+            calcCrclDisplay.innerHTML = `<span class="${colorClass}">${crclFormatted}</span> mL/min`;
+            headerCrcl.innerHTML = `<span class="${colorClass}">${crclFormatted}</span> mL/min`;
+            
+            return crcl;
+        }
+
+        // Adicionar event listeners para recalcular
+        inputCreatinina.addEventListener('input', calculateCrCl);
+        inputPeso.addEventListener('input', calculateCrCl);
+        inputIdade.addEventListener('input', calculateCrCl);
+        inputSexo.addEventListener('change', calculateCrCl);
+
+        // === 2. GERENCIAMENTO DE MEDICAMENTOS ===
+        
+        function renderTable() {
+            if (medicationsList.length === 0) {
+                medTableBody.innerHTML = `
+                    <tr class="border-b">
+                        <td colspan="4" class="px-4 py-8 text-center text-gray-400">Nenhum medicamento na lista de triagem.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            medTableBody.innerHTML = '';
+            medicationsList.forEach((med, index) => {
+                const isSosBadge = med.is_sos ? `<span class="bg-yellow-100 text-yellow-800 text-[10px] font-semibold px-2 py-0.5 rounded ml-2">SN/QN</span>` : '';
+                
+                const tr = document.createElement('tr');
+                tr.className = "bg-white border-b hover:bg-gray-50";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                        ${med.name} ${isSosBadge}
+                    </td>
+                    <td class="px-4 py-3 text-gray-600">
+                        ${med.dose} | ${med.route} | ${med.frequency}
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="text-gray-400 text-xs italic">Aguardando processamento...</span>
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="removeMedication(${index})" class="text-red-600 hover:text-red-900 text-xs font-medium bg-red-50 hover:bg-red-100 px-2 py-1 rounded">Remover</button>
+                    </td>
+                `;
+                medTableBody.appendChild(tr);
+            });
+            
+            // Atualizar contador de medicamentos
+            document.querySelector('.bg-gray-100.text-gray-800.text-xs.font-medium.mr-2').textContent = `${medicationsList.length} Medicamentos`;
+        }
+
+        window.removeMedication = function(index) {
+            medicationsList.splice(index, 1);
+            renderTable();
+            resultsArea.classList.add('hidden'); // Ocultar resultados ao modificar lista
+            document.getElementById('header-alerts').textContent = "0";
+        };
+
+        // Adição Manual
+        btnAddManual.addEventListener('click', () => {
+            const name = document.getElementById('manual-med-name').value.trim();
+            const dose = document.getElementById('manual-med-dose').value.trim();
+            const route = document.getElementById('manual-med-route').value;
+            const freq = document.getElementById('manual-med-freq').value.trim();
+            const isSos = document.getElementById('manual-med-sos').checked;
+
+            if (!name) {
+                alert("Por favor, insira o nome do medicamento.");
+                return;
+            }
+
+            medicationsList.push({
+                name: name,
+                dose: dose,
+                route: route,
+                frequency: freq,
+                is_sos: isSos
+            });
+
+            // Limpar campos
+            document.getElementById('manual-med-name').value = '';
+            document.getElementById('manual-med-dose').value = '';
+            document.getElementById('manual-med-freq').value = '';
+            document.getElementById('manual-med-sos').checked = false;
+
+            renderTable();
+            resultsArea.classList.add('hidden');
+        });
+
+        // Limpar Lista
+        document.getElementById('btn-clear').addEventListener('click', () => {
+            if(confirm("Tem certeza que deseja limpar todos os medicamentos?")) {
+                medicationsList = [];
+                renderTable();
+                resultsArea.classList.add('hidden');
+                document.getElementById('header-alerts').textContent = "0";
+                
+                // Limpar campos de input também
+                pdfUpload.value = '';
+                textUpload.value = '';
+            }
+        });
+
+        // === 3. INTEGRAÇÃO COM BACKEND ===
+
+        // Extrair PDF
+        btnExtract.addEventListener('click', async () => {
+            const file = pdfUpload.files[0];
+            const text = textUpload.value.trim();
+
+            if (!file && !text) {
+                alert("Por favor, selecione um arquivo PDF ou cole o texto da prescrição.");
+                return;
+            }
+
+            btnExtract.disabled = true;
+            btnExtract.textContent = "Processando...";
+            btnExtract.classList.add('opacity-75', 'cursor-not-allowed');
+
+            try {
+                if (file) {
+                    // Extração via PDF
+                    const formData = new FormData();
+                    formData.append("file", file);
+
+                    const response = await fetch(`${API_BASE_URL}/prescription/extract-pdf`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || "Erro ao processar PDF");
+                    }
+
+                    const data = await response.json();
+                    
+                    if (data.items && data.items.length > 0) {
+                        // Adicionar à lista mantendo o que já tem
+                        medicationsList = [...medicationsList, ...data.items];
+                        renderTable();
+                        alert(`Foram detectados ${data.items.length} medicamentos associados a possíveis critérios de risco.`);
+                    } else {
+                        alert("Nenhum medicamento correspondente aos Critérios de Beers foi detectado automaticamente.");
+                    }
+
+                } else if (text) {
+                    // O backend não tem uma rota direta para extrair de texto puro com a mesma estrutura
+                    // (A triagem normal via POST /screen aceita os nomes, mas não extrai).
+                    // Para simplificar, poderíamos criar uma lógica manual no JS ou avisar o usuário.
+                    // Vamos tentar empurrar o texto cru simulando um PDF (se o backend aceitasse text/plain)
+                    // Como não aceita, podemos pedir para inserir manualmente por enquanto.
+                    alert("A extração de texto colado requer integração. Por favor, adicione os medicamentos manualmente ou envie um PDF.");
+                }
+            } catch (error) {
+                console.error("Erro na extração:", error);
+                alert(`Erro: ${error.message}`);
+            } finally {
+                btnExtract.disabled = false;
+                btnExtract.textContent = "Extrair Prescrição Completa";
+                btnExtract.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        });
+
+        // Processar Triagem Completa
+        btnProcess.addEventListener('click', async () => {
+            if (medicationsList.length === 0) {
+                alert("Adicione medicamentos antes de processar a triagem.");
+                return;
+            }
+
+            const crcl = calculateCrCl();
+            const age = parseInt(inputIdade.value, 10) || 70;
+            const sector = document.getElementById('sector').value;
+            const fallRisk = document.getElementById('fall_risk').checked;
+
+            btnProcess.disabled = true;
+            btnProcess.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processando...`;
+
+            try {
+                const payload = {
+                    age: age,
+                    sector: sector,
+                    fall_risk: fallRisk,
+                    conditions: [], // Implementar captura das tags de condição se necessário
+                    crcl_ml_min: crcl,
+                    medications: medicationsList,
+                    persist: true // Salvar no banco
+                };
+
+                const response = await fetch(`${API_BASE_URL}/screen`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error("Falha ao processar triagem no servidor.");
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error("Erro na triagem:", error);
+                alert(`Erro ao processar triagem: ${error.message}`);
+            } finally {
+                btnProcess.disabled = false;
+                btnProcess.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Processar Triagem Completa
+                `;
+            }
+        });
+
+        function displayResults(data) {
+            resultsArea.classList.remove('hidden');
+            
+            // Atualizar cabeçalho
+            document.getElementById('header-alerts').textContent = data.total_beers_alerts || "0";
+
+            // Atualizar tabela (injetar as tags)
+            if (data.medication_rows && data.medication_rows.length > 0) {
+                medTableBody.innerHTML = ''; // Limpar tabela atual para re-renderizar com status
+                
+                data.medication_rows.forEach((row, index) => {
+                    const isSosBadge = row.is_sos ? `<span class="bg-yellow-100 text-yellow-800 text-[10px] font-semibold px-2 py-0.5 rounded ml-2">SN/QN</span>` : '';
+                    
+                    let statusBadge = '<span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded border border-gray-200">Sem Alerta Beers</span>';
+                    if (row.is_beers) {
+                        statusBadge = `<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded font-bold border border-red-200 uppercase">${row.alert_tag}</span>`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.className = row.is_beers ? "bg-red-50 border-b" : "bg-white border-b hover:bg-gray-50";
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                            ${row.name} ${isSosBadge}
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 text-xs">
+                            ${row.dose_route}
+                        </td>
+                        <td class="px-4 py-3">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="removeMedication(${index})" class="text-gray-400 hover:text-gray-900 text-xs">Remover</button>
+                        </td>
+                    `;
+                    medTableBody.appendChild(tr);
+                });
+            }
+
+            // Renderizar Alertas Detalhados
+            resultsContent.innerHTML = '';
+
+            // Card do Escore ACB
+            let acbColor = data.acb_score >= 3 ? "bg-red-50 border-red-200 text-red-800" : (data.acb_score > 0 ? "bg-yellow-50 border-yellow-200 text-yellow-800" : "bg-green-50 border-green-200 text-green-800");
+            
+            const acbCard = document.createElement('div');
+            acbCard.className = `p-4 border rounded-lg ${acbColor} mb-4 flex items-center justify-between`;
+            acbCard.innerHTML = `
+                <div>
+                    <h3 class="font-bold text-lg mb-1">Carga Anticolinérgica (ACB Score)</h3>
+                    <p class="text-sm">${data.acb_interpretation}</p>
+                </div>
+                <div class="text-3xl font-black ml-4">
+                    ${data.acb_score}
+                </div>
             `;
-          });
-          list.innerHTML = alertsHtml;
+            resultsContent.appendChild(acbCard);
+
+            if (!data.alerts || data.alerts.length === 0) {
+                const noAlerts = document.createElement('div');
+                noAlerts.className = "p-4 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm font-medium";
+                noAlerts.textContent = "Nenhum medicamento da lista violou os critérios de segurança (AGS Beers 2023) estabelecidos para o perfil avaliado.";
+                resultsContent.appendChild(noAlerts);
+                return;
+            }
+
+            // Cards de Alerta Específicos
+            data.alerts.forEach(alert => {
+                const card = document.createElement('div');
+                card.className = "p-4 border border-red-200 bg-white rounded-lg shadow-sm mb-3";
+                
+                // Se for SOS, estiliza diferente
+                const sosHighlight = alert.is_sos ? `<div class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 mb-2 inline-block rounded">ATENÇÃO: MEDICAÇÃO DE RESGATE (SOS)</div>` : '';
+
+                card.innerHTML = `
+                    ${sosHighlight}
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h3 class="font-bold text-red-700 text-lg uppercase tracking-tight">${alert.drug}</h3>
+                            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wide">${alert.axis}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 space-y-2">
+                        <div class="text-sm">
+                            <span class="font-bold text-gray-800">CONDUTA RECOMENDADA:</span>
+                            <span class="text-gray-700 font-medium">${alert.recommendation}</span>
+                        </div>
+                        <div class="text-sm">
+                            <span class="font-bold text-gray-800">RACIONAL CLÍNICO:</span>
+                            <span class="text-gray-600">${alert.rationale}</span>
+                        </div>
+                        <div class="text-sm bg-blue-50 p-2 rounded border border-blue-100 mt-2">
+                            <span class="font-bold text-blue-900">PLANO PRÁTICO (TAPERING):</span>
+                            <span class="text-blue-800">${alert.tapering}</span>
+                        </div>
+                    </div>
+                `;
+                resultsContent.appendChild(card);
+            });
+            
+            // Scroll suave para a área de resultados
+            resultsArea.scrollIntoView({ behavior: 'smooth' });
         }
 
-        try {
-          if (window.lucide) lucide.createIcons();
-        } catch (iconErr) {
-          console.warn("Aviso de renderização de ícones:", iconErr);
-        }
-
-        box.scrollIntoView({ behavior: "smooth" });
-      } catch (err) {
-        alert("Erro ao processar triagem: " + err.message + "\nVerifique sua conexão e tente novamente.");
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="shield-alert" class="w-4 h-4 mr-2 inline"></i><span>Processar Triagem Farm-Beers (AGS Beers 2023)</span>`;
-        if (window.lucide) lucide.createIcons();
-      }
-    }
-
-    async function setAlertOutcome(alertId, cardIndex, outcome) {
-      const container = document.getElementById(`outcomeContainer_${cardIndex}`);
-      
-      const labels = {
-        accepted: '<span class="bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">✓ Intervenção Aceita pelo Médico</span>',
-        rejected: '<span class="bg-rose-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">✗ Intervenção Recusada c/ Justificativa</span>',
-        not_applicable: '<span class="bg-slate-600 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">⚪ Conduta Não Aplicável</span>'
-      };
-
-      if (alertId) {
-        try {
-          await fetch(`/api/v1/alerts/${alertId}/outcome`, {
-            method: "PATCH",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ outcome })
-          });
-        } catch (e) {
-          console.warn("Aviso na gravação do desfecho:", e);
-        }
-      }
-
-      container.innerHTML = labels[outcome] || labels.accepted;
-    }
-
-    function copySoapNote() {
-      if (lastGeneratedAlerts.length === 0) {
-        alert("Nenhum alerta pendente para exportação.");
-        return;
-      }
-      const age = document.getElementById("inpAge").value || "70";
-      const sector = document.getElementById("selSector").value;
-      const crclText = calculatedCrCl ? `${calculatedCrCl} mL/min` : "Não informado";
-
-      let text = `EVOLUÇÃO FARMACÊUTICA - TRIAGEM FARMBEERS (AGS BEERS 2023)\n`;
-      text += `Setor: ${sector} | Idade: ${age} anos | ClCr Estimado: ${crclText}\n`;
-      text += `Carga Anticolinérgica Total: ${lastAcbSummary || "0 pontos"}\n\n`;
-      text += `[PROBLEMAS RELACIONADOS A MEDICAMENTOS (PRM) IDENTIFICADOS]:\n`;
-
-      lastGeneratedAlerts.forEach((a, idx) => {
-        const regime = a.is_sos ? "Regime: SN/QN (Resgate)" : "Regime: Fixo/Contínuo";
-        const dName = a.drug || a.drug_name || "Medicamento";
-        text += `${idx + 1}. ${dName} (${a.axis}) - ${regime}\n`;
-        text += `   - Conduta Sugerida: ${a.recommendation}\n`;
-        if (a.tapering) text += `   - Plano de Desmame: ${a.tapering}\n`;
-      });
-
-      text += `\nFarmácia Clínica à disposição para discussão de conduta junto à equipe médica.`;
-
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Evolução clínica copiada com sucesso! Pronta para colar no prontuário.");
-      }).catch(err => {
-        alert("Falha ao copiar: " + err);
-      });
-    }
-  </script>
+    </script>
 </body>
 </html>
