@@ -6,7 +6,7 @@ import hashlib
 import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 from pydantic import BaseModel
@@ -79,7 +79,7 @@ def run_auto_migrations():
                 conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS acb_score INTEGER DEFAULT 0;"))
                 conn.execute(text("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS crcl_ml_min DOUBLE PRECISION;"))
                 conn.commit()
-        except Exception as e:
+        except Exception:
             pass
 run_auto_migrations()
 
@@ -117,10 +117,7 @@ def init_default_users():
 
 init_default_users()
 
-# ==============================================================================
-# FASTAPI APP - RADAR BEERS
-# ==============================================================================
-app = FastAPI(title="Radar Beers API")
+app = FastAPI(title="Radar Beers API", version="10.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -145,6 +142,9 @@ class CreateUserRequest(BaseModel):
 class OutcomeRequest(BaseModel):
     outcome: str
 
+class TextExtractRequest(BaseModel):
+    text: str
+
 class MedicationInput(BaseModel):
     name: str
     dose: Optional[str] = ""
@@ -158,24 +158,23 @@ class ScreeningPayload(BaseModel):
     fall_risk: Optional[bool] = False
     conditions: Optional[List[str]] = []
     crcl_ml_min: Optional[float] = None
+    crcl_notes: Optional[str] = ""
     medications: List[MedicationInput] = []
     persist: Optional[bool] = True
 
 # ==============================================================================
-# ROTAS DE AUTENTICAÇÃO E USUÁRIOS
+# AUTENTICAÇÃO E USUÁRIOS
 # ==============================================================================
 @app.post("/api/v1/auth/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     pwd_h = hash_password(payload.password)
     user = db.query(User).filter(User.username == payload.username).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
-    if user.password != pwd_h and user.password != payload.password:
+    if not user or (user.password != pwd_h and user.password != payload.password):
         raise HTTPException(status_code=401, detail="Usuário ou senha incorretos.")
     if user.password == payload.password:
         user.password = pwd_h
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Acesso bloqueado.")
+        raise HTTPException(status_code=403, detail="Acesso bloqueado pela administração.")
     user.last_ping = datetime.datetime.utcnow()
     db.commit()
     return {"status": "ok", "user": {"id": user.id, "username": user.username, "role": user.role}}
@@ -200,19 +199,15 @@ def logout_user(payload: PingRequest, db: Session = Depends(get_db)):
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     now = datetime.datetime.utcnow()
-    res = []
-    for u in users:
-        is_online = bool(u.last_ping and (now - u.last_ping).total_seconds() <= 60)
-        res.append({
-            "id": u.id, "username": u.username, "role": u.role,
-            "is_active": u.is_active, "is_online": is_online
-        })
-    return res
+    return [{
+        "id": u.id, "username": u.username, "role": u.role,
+        "is_active": u.is_active,
+        "is_online": bool(u.last_ping and (now - u.last_ping).total_seconds() <= 60)
+    } for u in users]
 
 @app.post("/api/v1/admin/users")
 def create_user(payload: CreateUserRequest, db: Session = Depends(get_db)):
-    exists = db.query(User).filter(User.username == payload.username).first()
-    if exists:
+    if db.query(User).filter(User.username == payload.username).first():
         raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado.")
     new_u = User(
         username=payload.username, password=hash_password(payload.password),
@@ -228,10 +223,10 @@ def toggle_user_status(user_id: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido bloquear o admin.")
+        raise HTTPException(status_code=400, detail="Não é permitido bloquear o administrador padrão.")
     u.is_active = not u.is_active
     db.commit()
-    return {"status": "updated"}
+    return {"status": "updated", "is_active": u.is_active}
 
 @app.delete("/api/v1/admin/users/{user_id}")
 def delete_user(user_id: int, db: Session = Depends(get_db)):
@@ -239,13 +234,13 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if u.username == "admin":
-        raise HTTPException(status_code=400, detail="Não é permitido excluir o admin.")
+        raise HTTPException(status_code=400, detail="Não é permitido excluir o administrador padrão.")
     db.delete(u)
     db.commit()
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS EXCLUSIVAS DE ENFERMARIA
+# MÉTRICAS (EXCLUSIVO ENFERMARIA)
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Optional[str] = None, db: Session = Depends(get_db)):
@@ -263,8 +258,8 @@ def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Op
             screenings.append(s)
 
         total_patients = len(screenings)
-
         s_ids = [s.id for s in screenings]
+
         if s_ids:
             alerts = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.screening_id.in_(s_ids)).all()
             total_alerts = len(alerts)
@@ -284,30 +279,34 @@ def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Op
 
         return {
             "total_patients": total_patients,
-            "count_enfermaria": total_patients, 
+            "count_enfermaria": total_patients,
             "total_beers_alerts": total_alerts,
             "accepted_interventions": accepted_count,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception:
-        return {"total_patients": 0, "count_enfermaria": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
+        return {
+            "total_patients": 0, "count_enfermaria": 0,
+            "total_beers_alerts": 0, "accepted_interventions": 0,
+            "acceptance_rate": 0.0, "top_5_beers": []
+        }
 
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
     try:
         alert_rec = db.query(ScreeningAlertRecord).filter(ScreeningAlertRecord.id == alert_id).first()
         if not alert_rec:
-            return {"status": "not_found"}
+            return {"status": "not_found", "alert_id": alert_id}
         alert_rec.outcome = payload.outcome
         db.commit()
-        return {"status": "updated"}
+        return {"status": "updated", "alert_id": alert_id, "outcome": alert_rec.outcome}
     except Exception as e:
         db.rollback()
-        return {"status": "error"}
+        return {"status": "error", "detail": str(e)}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM GRAVAÇÃO - ENFERMARIA
+# MOTOR DE TRIAGEM
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -323,7 +322,6 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     )
 
     persisted_records = []
-    
     if payload.medications and payload.persist:
         try:
             record = ScreeningRecord(
@@ -380,7 +378,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         parts = [p for p in [m.dose, m.route, m.frequency] if p and p.strip()]
         dose_route_str = " ".join(parts) if parts else "VO (Oral)"
 
-        is_sn_flag = bool(m.is_sos) or any(t in dose_route_str.lower() for t in ["sn", "qn", "sos"])
+        is_sn_flag = bool(m.is_sos) or any(t in dose_route_str.lower() for t in ["sn", "qn", "sos", "necessario", "necessário"])
         if is_sn_flag and "[SN/QN]" not in dose_route_str:
             dose_route_str = f"{dose_route_str} [SN/QN]"
 
@@ -411,7 +409,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR
+# EXTRAÇÃO DE TEXTO E PDF HOSPITALAR
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
@@ -419,7 +417,7 @@ def extract_posology_details(line: str):
     freq = ""
     is_sn = False
 
-    m_dose = re.search(r'(\b\d+[\.,]?\d*\s*(?:mg|g|mcg|ml|gotas|gota|ampola|amp|cp|comp|frasco)\b)', line, re.I)
+    m_dose = re.search(r'(\b\d+[\.,]?\d*\s*(?:mg|g|mcg|ml|gotas|gota|ampola|amp|cp|comp|frasco|ui)\b)', line, re.I)
     if m_dose:
         dose = m_dose.group(1).strip()
 
@@ -444,58 +442,59 @@ def extract_posology_details(line: str):
 
     return dose, route, freq, is_sn
 
+def parse_prescription_lines(raw_text: str):
+    extracted_items = []
+    seen_generics = set()
+    for line in raw_text.split("\n"):
+        line_clean = line.strip()
+        if not line_clean:
+            continue
+        normalized_line = clinical_rules.normalize_text(line_clean)
+        found_generics_in_line = []
+        for generic, synonyms in clinical_rules.BEERS_DRUGS.items():
+            for syn in synonyms:
+                if clinical_rules.normalize_text(syn) in normalized_line:
+                    if generic not in found_generics_in_line:
+                        found_generics_in_line.append(generic)
+                    break
+        for generic in found_generics_in_line:
+            if generic not in seen_generics:
+                seen_generics.add(generic)
+                dose, route, freq, is_sn = extract_posology_details(line_clean)
+                extracted_items.append({
+                    "name": generic.capitalize(),
+                    "dose": dose,
+                    "route": route,
+                    "frequency": freq,
+                    "is_sos": is_sn
+                })
+    return extracted_items
+
 @app.post("/api/v1/prescription/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
     contents = await file.read()
-    extracted_items = []
-    seen_generics = set()
-    
+    full_text = ""
     try:
         with pdfplumber.open(io.BytesIO(contents)) as pdf:
             for page in pdf.pages:
-                text = page.extract_text()
-                if not text:
-                    continue
-                
-                for line in text.split("\n"):
-                    line_clean = line.strip()
-                    if not line_clean:
-                        continue
-                        
-                    normalized_line = clinical_rules.normalize_text(line_clean)
-                    found_generics_in_line = []
-                    
-                    for generic, synonyms in clinical_rules.BEERS_DRUGS.items():
-                        for syn in synonyms:
-                            if clinical_rules.normalize_text(syn) in normalized_line:
-                                if generic not in found_generics_in_line:
-                                    found_generics_in_line.append(generic)
-                                break 
-                    
-                    for generic in found_generics_in_line:
-                        if generic not in seen_generics:
-                            seen_generics.add(generic)
-                            dose, route, freq, is_sn = extract_posology_details(line_clean)
-                            extracted_items.append({
-                                "name": generic.capitalize(),
-                                "dose": dose,
-                                "route": route,
-                                "frequency": freq,
-                                "is_sos": is_sn
-                            })
-
+                t = page.extract_text()
+                if t:
+                    full_text += t + "\n"
+        extracted_items = parse_prescription_lines(full_text)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Erro ao ler PDF: {str(e)}")
 
     drug_names = [it["name"] for it in extracted_items]
-    return {
-        "medications": drug_names,
-        "drugs": drug_names,
-        "items": extracted_items
-    }
+    return {"medications": drug_names, "drugs": drug_names, "items": extracted_items}
+
+@app.post("/api/v1/prescription/extract-text")
+def extract_text(payload: TextExtractRequest):
+    extracted_items = parse_prescription_lines(payload.text)
+    drug_names = [it["name"] for it in extracted_items]
+    return {"medications": drug_names, "drugs": drug_names, "items": extracted_items}
 
 # ==============================================================================
-# CARREGAMENTO DO FRONTEND
+# ROTAS DO FRONTEND E MANUAL OPERACIONAL
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -503,3 +502,16 @@ def read_root():
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
     return "<h1>Radar Beers Online. Arquivo index.html não localizado.</h1>"
+
+@app.get("/manual.html", response_class=HTMLResponse)
+def read_manual():
+    if os.path.exists("manual.html"):
+        with open("manual.html", "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>Manual Operacional não encontrado.</h1>"
+
+@app.get("/logo.png")
+def get_logo():
+    if os.path.exists("logo.png"):
+        return FileResponse("logo.png")
+    raise HTTPException(status_code=404)
