@@ -2,9 +2,6 @@
 import re
 import unicodedata
 
-# =====================================================================
-# 1. DICIONÁRIO MESTRE DE DROGAS (Radar Beers / AGS 2023 + ACB)
-# =====================================================================
 BEERS_DRUGS = {
     "fenobarbital": ["fenobarbital", "gardenal", "fenocris", "edhanol"],
     "fenitoina": ["fenitoina", "hidantal", "epamin"],
@@ -372,7 +369,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             })
             if canonical not in med_tag_map: med_tag_map[canonical] = "Risco AVC/Mortalidade"
 
-    # INTERAÇÕES
     if len(snc_depressants) >= 2:
         alerts.append({
             "drug": "Múltiplos Depressores do SNC",
@@ -393,7 +389,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             "is_sos": False
         })
 
-    # ADAPTAÇÃO PARA DROGAS SOS/SN
     for alert in alerts:
         if alert.get("is_sos"):
             alert["recommendation"] = f"[RESGATE SOS]: {alert['recommendation']}"
