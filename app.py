@@ -16,7 +16,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
 import clinical_rules
 
 # ==============================================================================
-# BASE DE DADOS POSTGRESQL (Mantém farmbeers.db internamente para não perder histórico)
+# BASE DE DADOS POSTGRESQL / SQLITE
 # ==============================================================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmbeers.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -51,7 +51,7 @@ class ScreeningRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     pharmacist_username = Column(String(50), default="admin", nullable=True)
-    sector = Column(String(50), default="Enfermaria", nullable=True)
+    sector = Column(String(50), default="Enfermaria", nullable=False)
     patient_age = Column(Integer, default=70, nullable=True)
     crcl_ml_min = Column(Float, nullable=True)
     acb_score = Column(Integer, default=0, nullable=True)
@@ -118,7 +118,7 @@ def init_default_users():
 init_default_users()
 
 # ==============================================================================
-# FASTAPI APP - NOVO NOME
+# FASTAPI APP - RADAR BEERS
 # ==============================================================================
 app = FastAPI(title="Radar Beers API")
 
@@ -245,7 +245,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"status": "deleted"}
 
 # ==============================================================================
-# ROTA DE MÉTRICAS (EXCLUSIVO PARA ENFERMARIA)
+# ROTA DE MÉTRICAS EXCLUSIVAS DE ENFERMARIA
 # ==============================================================================
 @app.get("/api/v1/admin/metrics")
 def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Optional[str] = None, db: Session = Depends(get_db)):
@@ -284,16 +284,14 @@ def get_metrics(year: Optional[str] = None, month: Optional[str] = None, day: Op
 
         return {
             "total_patients": total_patients,
-            "count_enfermaria": total_patients,
-            "count_upi": 0,  # Mantido zerado caso o frontend ainda dependa da chave antiga
-            "count_uti": 0,  # Mantido zerado
+            "count_enfermaria": total_patients, 
             "total_beers_alerts": total_alerts,
             "accepted_interventions": accepted_count,
             "acceptance_rate": acceptance_rate,
             "top_5_beers": top_5
         }
     except Exception:
-        return {"total_patients": 0, "count_enfermaria": 0, "count_upi": 0, "count_uti": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
+        return {"total_patients": 0, "count_enfermaria": 0, "total_beers_alerts": 0, "accepted_interventions": 0, "acceptance_rate": 0.0, "top_5_beers": []}
 
 @app.patch("/api/v1/alerts/{alert_id}/outcome")
 def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = Depends(get_db)):
@@ -309,7 +307,7 @@ def update_alert_outcome(alert_id: int, payload: OutcomeRequest, db: Session = D
         return {"status": "error"}
 
 # ==============================================================================
-# MOTOR DE TRIAGEM COM GRAVAÇÃO (Foco em Enfermaria)
+# MOTOR DE TRIAGEM COM GRAVAÇÃO - ENFERMARIA
 # ==============================================================================
 @app.post("/api/v1/screen")
 def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
@@ -330,7 +328,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
         try:
             record = ScreeningRecord(
                 pharmacist_username="admin",
-                sector=str(payload.sector) if payload.sector else "Enfermaria",
+                sector="Enfermaria",
                 patient_age=int(patient_age),
                 crcl_ml_min=float(payload.crcl_ml_min) if payload.crcl_ml_min is not None else None,
                 acb_score=int(acb_total),
@@ -413,7 +411,7 @@ def process_screening(payload: ScreeningPayload, db: Session = Depends(get_db)):
     }
 
 # ==============================================================================
-# EXTRAÇÃO DE PDF HOSPITALAR VIA REGEX LINHA A LINHA
+# EXTRAÇÃO DE PDF HOSPITALAR
 # ==============================================================================
 def extract_posology_details(line: str):
     dose = ""
