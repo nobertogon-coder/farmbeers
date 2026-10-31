@@ -494,7 +494,7 @@ def extract_text(payload: TextExtractRequest):
     return {"medications": drug_names, "drugs": drug_names, "items": extracted_items}
 
 # ==============================================================================
-# ROTAS DO FRONTEND E MANUAL OPERACIONAL
+# ROTAS DO FRONTEND, MANUAL E LOGO
 # ==============================================================================
 @app.get("/", response_class=HTMLResponse)
 def read_root():
@@ -510,8 +510,9 @@ def read_manual():
             return f.read()
     return "<h1>Manual Operacional não encontrado.</h1>"
 
-@app.get("/logo.png")
+# ROTA PARA ENTREGAR A SUA LOGO
+@app.get("/logo.jpg")
 def get_logo():
-    if os.path.exists("logo.png"):
-        return FileResponse("logo.png")
-    raise HTTPException(status_code=404)
+    if os.path.exists("logo.jpg"):
+        return FileResponse("logo.jpg")
+    raise HTTPException(status_code=404, detail="Logo não encontrada no servidor")
