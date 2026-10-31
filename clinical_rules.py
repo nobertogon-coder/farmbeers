@@ -64,9 +64,6 @@ ACB_SCORES = {
     "risperidona": 1, "quetiapina": 1, "haloperidol": 1, "diazepam": 1, "alprazolam": 1
 }
 
-# =====================================================================
-# 2. FUNÇÕES DE PROCESSAMENTO
-# =====================================================================
 def normalize_text(text: str) -> str:
     if not text: return ""
     nfkd_form = unicodedata.normalize('NFKD', text)
@@ -91,9 +88,6 @@ def detect_drugs_in_prescription(prescription_text: str) -> list:
                 break
     return detected_drugs
 
-# =====================================================================
-# 3. MOTOR CLÍNICO: MAPA EXAUSTIVO (BLINDADO)
-# =====================================================================
 def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, crcl=None):
     alerts = []
     acb_total = 0
@@ -115,7 +109,6 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
 
         is_sos = med.get("is_sos", False)
 
-        # PARTE A: ESCORE ACB
         if canonical in ACB_SCORES:
             score = ACB_SCORES[canonical]
             acb_total += score
@@ -128,8 +121,8 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "is_sos": is_sos,
                 "acb_score": score
             })
+            med_tag_map[canonical] = "Carga Anticolinérgica"
 
-        # PARTE B: REGRAS ESTRITAS DE BEERS
         if canonical in ["prometazina", "dimenidrinato", "dexclorfeniramina", "hidroxizina", "escopolamina", "amitriptilina", "nortriptilina"]:
             alerts.append({
                 "drug": canonical.capitalize(),
@@ -139,7 +132,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Substituir por anti-histamínicos de 2ª geração ou suspender.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Alto Risco Anticolinérgico"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Alto Risco Anticolinérgico"
 
         elif canonical in ["diazepam", "clonazepam", "lorazepam", "midazolam", "alprazolam", "zolpidem", "fenobarbital"]:
             snc_depressants.append(canonical)
@@ -151,7 +144,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Redução gradual de 25% da dose a cada 7-14 dias. Não suspender abruptamente.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Queda/SNC"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Queda/SNC"
 
         elif canonical == "fenitoina":
             alerts.append({
@@ -162,7 +155,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Monitorar nível sérico livre. Avaliar transição para Levetiracetam.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Tox. Neurológica"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Tox. Neurológica"
 
         elif canonical in ["carbamazepina", "acido valproico"]:
             snc_depressants.append(canonical)
@@ -174,7 +167,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Dosar sódio sérico e evitar polifarmácia concomitante.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco SNC/SIADH"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco SNC/SIADH"
 
         elif canonical in ["ciclobenzaprina", "orfenadrina", "carisoprodol"]:
             alerts.append({
@@ -185,7 +178,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Suspender. Preferir analgesia simples ou compressas.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Relaxante Muscular Inadequado"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Relaxante Muscular Inadequado"
 
         elif canonical in ["cetoprofeno", "diclofenaco", "ibuprofeno", "naproxeno", "nimesulida", "cetorolaco", "meloxicam"]:
             nsaids.append(canonical)
@@ -197,7 +190,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Suspender imediatamente. Substituir por Paracetamol ou opioide fraco.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Renal/HDA"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Renal/HDA"
 
         elif canonical in ["morfina", "tramadol", "codeina"]:
             snc_depressants.append(canonical)
@@ -211,7 +204,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                         "tapering": "Substituir por Fentanila ou Metadona (metabolismo hepático).",
                         "is_sos": is_sos
                     })
-                    med_tag_map[canonical] = "Ajuste Renal Crítico"
+                    if canonical not in med_tag_map: med_tag_map[canonical] = "Ajuste Renal Crítico"
                 else:
                     alerts.append({
                         "drug": canonical.capitalize(),
@@ -221,7 +214,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                         "tapering": "Se CrCl desconhecido, solicitar exame antes da manutenção da droga.",
                         "is_sos": is_sos
                     })
-                    med_tag_map[canonical] = "Risco Opioide/Renal"
+                    if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Opioide/Renal"
             else:
                 alerts.append({
                     "drug": canonical.capitalize(),
@@ -231,7 +224,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                     "tapering": "Usar a menor dose possível. Associar macrogol se uso regular.",
                     "is_sos": is_sos
                 })
-                med_tag_map[canonical] = "Opioide/SNC"
+                if canonical not in med_tag_map: med_tag_map[canonical] = "Opioide/SNC"
 
         elif canonical in ["clonidina", "doxazosina", "metildopa"]:
             alerts.append({
@@ -242,7 +235,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Desmame progressivo (Clonidina pode causar rebote fatal se parada subitamente).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Ortostático"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Ortostático"
 
         elif canonical == "amiodarona":
             alerts.append({
@@ -253,7 +246,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Avaliar controle de frequência no lugar de ritmo.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Tox. Cumulativa"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Tox. Cumulativa"
 
         elif canonical == "digoxina":
             alerts.append({
@@ -264,7 +257,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Monitorar função renal e K+.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Janela Estreita"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Janela Estreita"
 
         elif canonical == "espironolactona":
             if crcl is not None and crcl < 30:
@@ -276,7 +269,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                     "tapering": "Suspender droga imediatamente.",
                     "is_sos": is_sos
                 })
-                med_tag_map[canonical] = "Ajuste Renal Crítico"
+                if canonical not in med_tag_map: med_tag_map[canonical] = "Ajuste Renal Crítico"
             else:
                 alerts.append({
                     "drug": canonical.capitalize(),
@@ -286,7 +279,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                     "tapering": "Garantir medição de eletrólitos antes da dose.",
                     "is_sos": is_sos
                 })
-                med_tag_map[canonical] = "Risco Hipercalemia"
+                if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Hipercalemia"
 
         elif canonical == "enoxaparina":
             anticoagulants.append(canonical)
@@ -299,7 +292,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                     "tapering": "Ajustar dose ou transicionar para Heparina Não Fracionada (HNF).",
                     "is_sos": is_sos
                 })
-                med_tag_map[canonical] = "Ajuste Renal Crítico"
+                if canonical not in med_tag_map: med_tag_map[canonical] = "Ajuste Renal Crítico"
             else:
                 alerts.append({
                     "drug": canonical.capitalize(),
@@ -309,7 +302,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                     "tapering": "Garantir o cálculo Cockcroft-Gault antes de manter prescrição plena.",
                     "is_sos": is_sos
                 })
-                med_tag_map[canonical] = "Ajuste Renal"
+                if canonical not in med_tag_map: med_tag_map[canonical] = "Ajuste Renal"
 
         elif canonical == "varfarina":
             anticoagulants.append(canonical)
@@ -321,7 +314,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Controle estrito de RNI (INR).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Hemorragia"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Hemorragia"
 
         elif canonical in ["glibenclamida", "glimepirida"]:
             alerts.append({
@@ -332,7 +325,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Substituir por Inibidor de DPP-4 (ex: Linagliptina).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Hipoglicemia"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Hipoglicemia"
 
         elif canonical == "metoclopramida":
             alerts.append({
@@ -343,7 +336,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Trocar por Ondansetrona ou Domperidona (menor penetração central).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Extrapiramidal"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Extrapiramidal"
 
         elif canonical == "oleo mineral":
             alerts.append({
@@ -354,7 +347,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Substituir por laxantes osmóticos (Macrogol ou Lactulose).",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco Aspiração"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco Aspiração"
 
         elif canonical in ["omeprazol", "pantoprazol"]:
             alerts.append({
@@ -365,7 +358,7 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Reduzir 50% da dose ou espaçar para dias alternados até suspensão.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Uso Crônico Indevido"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Uso Crônico Indevido"
 
         elif canonical in ["risperidona", "quetiapina", "haloperidol", "olanzapina", "clorpromazina"]:
             snc_depressants.append(canonical)
@@ -377,9 +370,9 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
                 "tapering": "Usar apenas no delirium hiperativo grave. Desmamar o quanto antes.",
                 "is_sos": is_sos
             })
-            med_tag_map[canonical] = "Risco AVC/Mortalidade"
+            if canonical not in med_tag_map: med_tag_map[canonical] = "Risco AVC/Mortalidade"
 
-    # PARTE C: INTERAÇÕES SINÉRGICAS
+    # INTERAÇÕES
     if len(snc_depressants) >= 2:
         alerts.append({
             "drug": "Múltiplos Depressores do SNC",
@@ -400,17 +393,16 @@ def evaluate_patient_beers(medications, age, fall_risk=False, conditions=None, c
             "is_sos": False
         })
 
-    # PARTE D: ADAPTAÇÃO PARA DROGAS SOS/SN (Evitar administração pela enfermagem)
+    # ADAPTAÇÃO PARA DROGAS SOS/SN
     for alert in alerts:
         if alert.get("is_sos"):
-            alert["recommendation"] = f"[RESGATE SOS]: {alert['recommendation']} Orientar a enfermagem a reter a administração e comunicar o farmacêutico."
-            alert["tapering"] = "Solicitar bloqueio do uso à equipe assistencial e sugerir troca do item de resgate."
+            alert["recommendation"] = f"[RESGATE SOS]: {alert['recommendation']}"
+            alert["tapering"] = "Orientar a enfermagem a reter a administração sem avaliação clínica prévia e sugerir ao prescritor a troca do item de resgate."
 
-    # PARTE E: FECHAMENTO ACB
     acb_text = "Carga Nula ou Leve. Risco controlado."
     if acb_total >= 3:
-        acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo, delirium e retenção periférica."
+        acb_text = f"ALTO RISCO (Score {acb_total}). Probabilidade severa de declínio cognitivo e delirium."
     elif acb_total in [1, 2]:
-        acb_text = f"Carga Moderada (Score {acb_total}). Vigiar queixas de constipação e confusão mental."
+        acb_text = f"Carga Moderada (Score {acb_total}). Vigiar retenção urinária e confusão mental."
 
     return alerts, acb_total, acb_text, med_tag_map
